@@ -1,5 +1,11 @@
 package main
 
+import (
+	"log"
+	"net/http"
+)
+
 func main() {
-	println("Hello, Go!")
+	handler := http.Handler(NewServer())
+	log.Fatal(http.ListenAndServe(":8000", handler))
 }
