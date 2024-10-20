@@ -5,12 +5,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	yatda "github.com/AnthonyDickson/yatda"
+	yatta "github.com/AnthonyDickson/yatta"
 )
 
 func TestGetTeapot(t *testing.T) {
 	t.Run("returns status 418", func(t *testing.T) {
-		server := yatda.NewServer()
+		server := yatta.NewServer()
 
 		response := httptest.NewRecorder()
 		request := newGetCoffeeRequest(t)

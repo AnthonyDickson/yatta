@@ -1,3 +1,3 @@
-module github.com/AnthonyDickson/yatda
+module github.com/AnthonyDickson/yatta
 
 go 1.22.7
