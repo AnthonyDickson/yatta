@@ -5,12 +5,18 @@ import (
 	"net/http"
 )
 
+type TodoStore interface {
+	GetTodos(name string) string
+}
+
 type Server struct {
+	store TodoStore
 	http.Handler
 }
 
-func NewServer() *Server {
+func NewServer(store TodoStore) *Server {
 	server := new(Server)
+	server.store = store
 
 	router := http.NewServeMux()
 	router.Handle("/coffee", http.HandlerFunc(server.getCoffee))
@@ -27,11 +33,11 @@ func (s *Server) getCoffee(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
 	user := r.PathValue("user")
+	todos := s.store.GetTodos(user)
 
-	if user == "Alice" {
-		fmt.Fprint(w, "send message to Bob")
-		return
+	if todos == "" {
+		w.WriteHeader(http.StatusNotFound)
 	}
 
-	fmt.Fprint(w, "write more code")
+	fmt.Fprint(w, todos)
 }

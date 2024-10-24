@@ -5,7 +5,15 @@ import (
 	"net/http"
 )
 
+type InMemoryTodoStore struct{}
+
+func (i *InMemoryTodoStore) GetTodos(user string) string {
+	return ""
+}
+
 func main() {
-	handler := http.Handler(NewServer())
+	store := new(InMemoryTodoStore)
+	server := NewServer(store)
+	handler := http.Handler(server)
 	log.Fatal(http.ListenAndServe(":8000", handler))
 }

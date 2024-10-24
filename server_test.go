@@ -9,9 +9,17 @@ import (
 	yatta "github.com/AnthonyDickson/yatta"
 )
 
+type StubTodoStore struct {
+	store map[string]string
+}
+
+func (s *StubTodoStore) GetTodos(user string) string {
+	return s.store[user]
+}
+
 func TestGetTeapot(t *testing.T) {
 	t.Run("returns status 418", func(t *testing.T) {
-		server := yatta.NewServer()
+		server := yatta.NewServer(new(StubTodoStore))
 
 		response := httptest.NewRecorder()
 		request := newGetCoffeeRequest(t)
@@ -23,11 +31,17 @@ func TestGetTeapot(t *testing.T) {
 }
 
 func TestGetTodos(t *testing.T) {
-	t.Run("returns todos for Alice", func(t *testing.T) {
-		server := yatta.NewServer()
+	store := &StubTodoStore{
+		store: map[string]string{
+			"Alice": "send message to Bob",
+			"thor":  "write more code",
+		},
+	}
+	server := yatta.NewServer(store)
 
-		response := httptest.NewRecorder()
+	t.Run("returns todos for Alice", func(t *testing.T) {
 		request := newGetTodosRequest(t, "Alice")
+		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
 
@@ -39,10 +53,8 @@ func TestGetTodos(t *testing.T) {
 	})
 
 	t.Run("returns todos for thor", func(t *testing.T) {
-		server := yatta.NewServer()
-
-		response := httptest.NewRecorder()
 		request := newGetTodosRequest(t, "thor")
+		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
 
@@ -50,6 +62,15 @@ func TestGetTodos(t *testing.T) {
 
 		want := "write more code"
 		assertResponseBody(t, response, want)
+	})
+
+	t.Run("returns 404 for nonexistent user", func(t *testing.T) {
+		request := newGetTodosRequest(t, "Bob")
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusNotFound)
 	})
 }
 
