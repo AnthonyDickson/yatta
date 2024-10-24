@@ -19,5 +19,5 @@ func TestCreateAndGetTodo(t *testing.T) {
 	server.ServeHTTP(response, newGetTodosRequest(t, "Pierre"))
 
 	assertStatus(t, response, http.StatusOK)
-	assertResponseBody(t, response, "eat")
+	assertResponseBody(t, response, "write a book")
 }
