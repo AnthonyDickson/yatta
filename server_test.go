@@ -2,19 +2,31 @@ package main_test
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	yatta "github.com/AnthonyDickson/yatta"
 )
 
+type addTodoCall struct {
+	user string
+	task string
+}
+
 type StubTodoStore struct {
-	store map[string]string
+	store    map[string]string
+	addCalls []addTodoCall
 }
 
 func (s *StubTodoStore) GetTodos(user string) string {
 	return s.store[user]
+}
+
+func (s *StubTodoStore) AddTodo(user string, task string) {
+	s.addCalls = append(s.addCalls, addTodoCall{user, task})
 }
 
 func TestGetTeapot(t *testing.T) {
@@ -74,6 +86,46 @@ func TestGetTodos(t *testing.T) {
 	})
 }
 
+func TestCreateTodos(t *testing.T) {
+	t.Run("creates todo on POST", func(t *testing.T) {
+		store := &StubTodoStore{
+			store: map[string]string{},
+		}
+		server := yatta.NewServer(store)
+
+		want := addTodoCall{
+			user: "Alice",
+			task: "encrypt messages",
+		}
+
+		request := newTodosRequest(t, http.MethodPost, want.user, strings.NewReader(want.task))
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusAccepted)
+		assertAddCalls(t, store, want)
+	})
+}
+
+func assertAddCalls(t *testing.T, store *StubTodoStore, want addTodoCall) {
+	t.Helper()
+
+	if len(store.addCalls) != 1 {
+		t.Fatalf("got %d calls to add todo, want %d", len(store.addCalls), 1)
+	}
+
+	got := store.addCalls[0]
+
+	if got.user != want.user {
+		t.Errorf("got call to add with user %q, want %q", got.user, want.user)
+	}
+
+	if got.task != want.task {
+		t.Errorf("got call to add with task %q, want %q", got.task, want.task)
+	}
+}
+
 func assertResponseBody(t *testing.T, response *httptest.ResponseRecorder, want string) {
 	t.Helper()
 	got := response.Body.String()
@@ -96,9 +148,16 @@ func newGetCoffeeRequest(t *testing.T) *http.Request {
 }
 
 func newGetTodosRequest(t *testing.T, user string) *http.Request {
+	t.Helper()
+
+	return newTodosRequest(t, http.MethodGet, user, nil)
+}
+
+func newTodosRequest(t *testing.T, method string, user string, body io.Reader) *http.Request {
+	t.Helper()
+
 	path := fmt.Sprintf("/users/%s/todos", user)
-	method := http.MethodGet
-	request, err := http.NewRequest(method, path, nil)
+	request, err := http.NewRequest(method, path, body)
 
 	if err != nil {
 		t.Fatalf("could not create request for path %s using method %s: %v", path, method, err)
