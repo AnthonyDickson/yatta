@@ -1,13 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 )
 
+const jsonContentType = "application/json"
+
 type TodoStore interface {
-	GetTodos(user string) string
+	GetTodos(user string) []string
 	AddTodo(user string, task string)
 }
 
@@ -38,16 +42,37 @@ func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
 	user := r.PathValue("user")
 	todos := s.store.GetTodos(user)
 
-	if todos == "" {
+	if todos == nil {
 		w.WriteHeader(http.StatusNotFound)
+		return
 	}
 
-	fmt.Fprint(w, todos)
+	jsonData, err := json.Marshal(todos)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Warn(fmt.Sprintf("an error occurred while encoding the JSON response for %v: %v", todos, err))
+		return
+	}
+
+	w.Header().Add("content-type", jsonContentType)
+	_, err = w.Write(jsonData)
+
+	if err != nil {
+		slog.Warn(fmt.Sprintf("an error occurred while writing the response body %v: %v", jsonData, err))
+	}
 }
 
 func (s *Server) addTodo(w http.ResponseWriter, r *http.Request) {
 	user := r.PathValue("user")
-	bodyBytes, _ := io.ReadAll(r.Body)
+	bodyBytes, err := io.ReadAll(r.Body)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Warn(fmt.Sprintf("an error occurred while reading the request body %v: %v", r.Body, err))
+		return
+	}
+
 	task := string(bodyBytes)
 
 	s.store.AddTodo(user, task)

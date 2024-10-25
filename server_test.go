@@ -1,15 +1,19 @@
 package main_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
 	yatta "github.com/AnthonyDickson/yatta"
 )
+
+const jsonContentType = "application/json"
 
 type addTodoCall struct {
 	user string
@@ -17,11 +21,11 @@ type addTodoCall struct {
 }
 
 type StubTodoStore struct {
-	store    map[string]string
+	store    map[string][]string
 	addCalls []addTodoCall
 }
 
-func (s *StubTodoStore) GetTodos(user string) string {
+func (s *StubTodoStore) GetTodos(user string) []string {
 	return s.store[user]
 }
 
@@ -44,9 +48,9 @@ func TestGetTeapot(t *testing.T) {
 
 func TestGetTodos(t *testing.T) {
 	store := &StubTodoStore{
-		store: map[string]string{
-			"Alice": "send message to Bob",
-			"thor":  "write more code",
+		store: map[string][]string{
+			"Alice": {"send message to Bob"},
+			"thor":  {"write more code"},
 		},
 	}
 	server := yatta.NewServer(store)
@@ -58,9 +62,8 @@ func TestGetTodos(t *testing.T) {
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusOK)
-
-		want := "send message to Bob"
-		assertResponseBody(t, response, want)
+		assertContentType(t, response, jsonContentType)
+		assertResponseBody(t, response, []string{"send message to Bob"})
 
 	})
 
@@ -71,9 +74,8 @@ func TestGetTodos(t *testing.T) {
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusOK)
-
-		want := "write more code"
-		assertResponseBody(t, response, want)
+		assertContentType(t, response, jsonContentType)
+		assertResponseBody(t, response, []string{"write more code"})
 	})
 
 	t.Run("returns 404 for nonexistent user", func(t *testing.T) {
@@ -89,7 +91,7 @@ func TestGetTodos(t *testing.T) {
 func TestCreateTodos(t *testing.T) {
 	t.Run("creates todo on POST", func(t *testing.T) {
 		store := &StubTodoStore{
-			store: map[string]string{},
+			store: map[string][]string{},
 		}
 		server := yatta.NewServer(store)
 
@@ -98,39 +100,82 @@ func TestCreateTodos(t *testing.T) {
 			task: "encrypt messages",
 		}
 
-		request := newTodosRequest(t, http.MethodPost, want.user, strings.NewReader(want.task))
+		request := newCreateTodosRequest(t, want.user, want.task)
 		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusAccepted)
-		assertAddCalls(t, store, want)
+		assertAddCalls(t, store, []addTodoCall{want})
+	})
+
+	t.Run("create multiple todos", func(t *testing.T) {
+		store := &StubTodoStore{
+			store: map[string][]string{},
+		}
+		server := yatta.NewServer(store)
+
+		cases := []addTodoCall{
+			{"Thor", "write code"},
+			{"Thor", "debug code"},
+			{"Thor", "fix code"},
+		}
+
+		for _, want := range cases {
+			request := newCreateTodosRequest(t, want.user, want.task)
+			response := httptest.NewRecorder()
+
+			server.ServeHTTP(response, request)
+
+			assertStatus(t, response, http.StatusAccepted)
+		}
+
+		assertAddCalls(t, store, cases)
 	})
 }
 
-func assertAddCalls(t *testing.T, store *StubTodoStore, want addTodoCall) {
+func assertContentType(t *testing.T, response *httptest.ResponseRecorder, want string) {
 	t.Helper()
 
-	if len(store.addCalls) != 1 {
-		t.Fatalf("got %d calls to add todo, want %d", len(store.addCalls), 1)
-	}
+	got := response.Result().Header.Get("content-type")
 
-	got := store.addCalls[0]
-
-	if got.user != want.user {
-		t.Errorf("got call to add with user %q, want %q", got.user, want.user)
-	}
-
-	if got.task != want.task {
-		t.Errorf("got call to add with task %q, want %q", got.task, want.task)
+	if got != want {
+		t.Errorf("got header content-type %q want %q", got, want)
 	}
 }
 
-func assertResponseBody(t *testing.T, response *httptest.ResponseRecorder, want string) {
+func assertAddCalls(t *testing.T, store *StubTodoStore, wantCalls []addTodoCall) {
 	t.Helper()
-	got := response.Body.String()
 
-	if got != want {
+	if len(store.addCalls) != len(wantCalls) {
+		t.Fatalf("got %d calls to add todo, want %d", len(store.addCalls), len(wantCalls))
+	}
+
+	for i := 0; i < len(wantCalls); i++ {
+		got := store.addCalls[i]
+		want := wantCalls[i]
+
+		if got.user != want.user {
+			t.Errorf("got call to add with user %q, want %q", got.user, want.user)
+		}
+
+		if got.task != want.task {
+			t.Errorf("got call to add with task %q, want %q", got.task, want.task)
+		}
+	}
+}
+
+func assertResponseBody(t *testing.T, response *httptest.ResponseRecorder, want []string) {
+	t.Helper()
+
+	var got []string
+	err := json.NewDecoder(response.Body).Decode(&got)
+
+	if err != nil {
+		t.Fatalf("a problem ocurred while decoding the response body as JSON: %v", err)
+	}
+
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got response body %q want %q", got, want)
 	}
 }
@@ -151,6 +196,12 @@ func newGetTodosRequest(t *testing.T, user string) *http.Request {
 	t.Helper()
 
 	return newTodosRequest(t, http.MethodGet, user, nil)
+}
+
+func newCreateTodosRequest(t *testing.T, user string, task string) *http.Request {
+	t.Helper()
+
+	return newTodosRequest(t, http.MethodPost, user, strings.NewReader(task))
 }
 
 func newTodosRequest(t *testing.T, method string, user string, body io.Reader) *http.Request {
