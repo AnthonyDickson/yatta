@@ -1,7 +1,6 @@
 package main_test
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,29 +10,40 @@ import (
 	"testing"
 
 	yatta "github.com/AnthonyDickson/yatta"
+	"golang.org/x/net/html"
 )
 
-const jsonContentType = "application/json"
+const htmlContentType = "text/html"
 
 type addTodoCall struct {
 	user string
 	task string
 }
 
+type getTodosCall struct {
+	user  string
+	tasks []string
+}
+
 type StubTodoStore struct {
-	store    map[string][]string
-	addCalls []addTodoCall
+	store         map[string][]string
+	addCalls      []addTodoCall
+	getTodosCalls []getTodosCall
 }
 
 func (s *StubTodoStore) GetTodos(user string) []string {
-	return s.store[user]
+	tasks := s.store[user]
+
+	s.getTodosCalls = append(s.getTodosCalls, getTodosCall{user, tasks})
+
+	return tasks
 }
 
 func (s *StubTodoStore) AddTodo(user string, task string) {
 	s.addCalls = append(s.addCalls, addTodoCall{user, task})
 }
 
-func TestGetTeapot(t *testing.T) {
+func TestGetCoffee(t *testing.T) {
 	t.Run("returns status 418", func(t *testing.T) {
 		server := yatta.NewServer(new(StubTodoStore))
 
@@ -47,38 +57,50 @@ func TestGetTeapot(t *testing.T) {
 }
 
 func TestGetTodos(t *testing.T) {
-	store := &StubTodoStore{
-		store: map[string][]string{
-			"Alice": {"send message to Bob"},
-			"thor":  {"write more code"},
-		},
+	getStoreAndServer := func() (*StubTodoStore, *yatta.Server) {
+		store := &StubTodoStore{
+			store: map[string][]string{
+				"Alice": {"send message to Bob"},
+				"thor":  {"write more code"},
+			},
+		}
+		server := yatta.NewServer(store)
+		return store, server
 	}
-	server := yatta.NewServer(store)
 
 	t.Run("returns todos for Alice", func(t *testing.T) {
-		request := newGetTodosRequest(t, "Alice")
+		store, server := getStoreAndServer()
+		want := getTodosCall{"Alice", []string{"send message to Bob"}}
+
+		request := newGetTodosRequest(t, want.user)
 		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusOK)
-		assertContentType(t, response, jsonContentType)
-		assertResponseBody(t, response, []string{"send message to Bob"})
+		assertContentType(t, response, htmlContentType)
+		assertGetTodosCall(t, store, want)
+		assertResponseBody(t, response, want.tasks)
 
 	})
 
 	t.Run("returns todos for thor", func(t *testing.T) {
-		request := newGetTodosRequest(t, "thor")
+		store, server := getStoreAndServer()
+		want := getTodosCall{"thor", []string{"write more code"}}
+
+		request := newGetTodosRequest(t, want.user)
 		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusOK)
-		assertContentType(t, response, jsonContentType)
-		assertResponseBody(t, response, []string{"write more code"})
+		assertContentType(t, response, htmlContentType)
+		assertGetTodosCall(t, store, want)
+		assertResponseBody(t, response, want.tasks)
 	})
 
 	t.Run("returns 404 for nonexistent user", func(t *testing.T) {
+		_, server := getStoreAndServer()
 		request := newGetTodosRequest(t, "Bob")
 		response := httptest.NewRecorder()
 
@@ -134,52 +156,6 @@ func TestCreateTodos(t *testing.T) {
 	})
 }
 
-func assertContentType(t *testing.T, response *httptest.ResponseRecorder, want string) {
-	t.Helper()
-
-	got := response.Result().Header.Get("content-type")
-
-	if got != want {
-		t.Errorf("got header content-type %q want %q", got, want)
-	}
-}
-
-func assertAddCalls(t *testing.T, store *StubTodoStore, wantCalls []addTodoCall) {
-	t.Helper()
-
-	if len(store.addCalls) != len(wantCalls) {
-		t.Fatalf("got %d calls to add todo, want %d", len(store.addCalls), len(wantCalls))
-	}
-
-	for i := 0; i < len(wantCalls); i++ {
-		got := store.addCalls[i]
-		want := wantCalls[i]
-
-		if got.user != want.user {
-			t.Errorf("got call to add with user %q, want %q", got.user, want.user)
-		}
-
-		if got.task != want.task {
-			t.Errorf("got call to add with task %q, want %q", got.task, want.task)
-		}
-	}
-}
-
-func assertResponseBody(t *testing.T, response *httptest.ResponseRecorder, want []string) {
-	t.Helper()
-
-	var got []string
-	err := json.NewDecoder(response.Body).Decode(&got)
-
-	if err != nil {
-		t.Fatalf("a problem ocurred while decoding the response body as JSON: %v", err)
-	}
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got response body %q want %q", got, want)
-	}
-}
-
 func newGetCoffeeRequest(t *testing.T) *http.Request {
 	path := "/coffee"
 	method := http.MethodGet
@@ -225,4 +201,100 @@ func assertStatus(t *testing.T, response *httptest.ResponseRecorder, want int) {
 	if got != want {
 		t.Errorf("got status %d want %d", got, want)
 	}
+}
+
+func assertContentType(t *testing.T, response *httptest.ResponseRecorder, want string) {
+	t.Helper()
+
+	got := response.Result().Header.Get("content-type")
+
+	if got != want {
+		t.Errorf("got header content-type %q want %q", got, want)
+	}
+}
+
+func assertAddCalls(t *testing.T, store *StubTodoStore, wantCalls []addTodoCall) {
+	t.Helper()
+
+	if len(store.addCalls) != len(wantCalls) {
+		t.Fatalf("got %d calls to add todo, want %d", len(store.addCalls), len(wantCalls))
+	}
+
+	for i := 0; i < len(wantCalls); i++ {
+		got := store.addCalls[i]
+		want := wantCalls[i]
+
+		if got.user != want.user {
+			t.Errorf("got call to add with user %q, want %q", got.user, want.user)
+		}
+
+		if got.task != want.task {
+			t.Errorf("got call to add with task %q, want %q", got.task, want.task)
+		}
+	}
+}
+
+func assertGetTodosCall(t *testing.T, store *StubTodoStore, want getTodosCall) {
+	t.Helper()
+
+	calls := store.getTodosCalls
+
+	if len(calls) != 1 {
+		t.Errorf("got %d call(s) to GetTodos want 1", len(calls))
+	}
+
+	got := calls[0]
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got calls to GetTodos %q, want %q", got, want)
+	}
+}
+
+func assertResponseBody(t *testing.T, response *httptest.ResponseRecorder, want []string) {
+	t.Helper()
+
+	doc, err := html.Parse(response.Body)
+
+	if err != nil {
+		t.Fatalf("a problem ocurred while decoding the response body as HTML: %v", err)
+	}
+
+	got := extractTodosFromHTML(t, doc)
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got response body %q want %q", got, want)
+	}
+}
+
+func extractTodosFromHTML(t *testing.T, htmlFragment *html.Node) []string {
+	t.Helper()
+
+	todos := []string{}
+
+	var extractText func(*html.Node)
+	extractText = func(node *html.Node) {
+		if node.Type == html.TextNode {
+			todos = append(todos, node.Data)
+			return
+		}
+
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			extractText(child)
+		}
+	}
+
+	var findTodos func(*html.Node)
+	findTodos = func(node *html.Node) {
+		if node.Type == html.ElementNode && node.Data == "li" {
+			extractText(node)
+		}
+
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			findTodos(child)
+		}
+	}
+
+	findTodos(htmlFragment)
+
+	return todos
 }

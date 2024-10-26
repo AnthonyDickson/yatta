@@ -1,14 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 )
 
-const jsonContentType = "application/json"
+const htmlContentType = "text/html"
 
 type TodoStore interface {
 	GetTodos(user string) []string
@@ -47,20 +46,13 @@ func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonData, err := json.Marshal(todos)
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Warn(fmt.Sprintf("an error occurred while encoding the JSON response for %v: %v", todos, err))
-		return
+	w.Header().Add("content-type", htmlContentType)
+	// TODO: Render HTML with templates
+	fmt.Fprint(w, "<ul>")
+	for _, todo := range todos {
+		fmt.Fprintf(w, "<li>%s</li>", todo)
 	}
-
-	w.Header().Add("content-type", jsonContentType)
-	_, err = w.Write(jsonData)
-
-	if err != nil {
-		slog.Warn(fmt.Sprintf("an error occurred while writing the response body %v: %v", jsonData, err))
-	}
+	fmt.Fprint(w, "</ul>")
 }
 
 func (s *Server) addTodo(w http.ResponseWriter, r *http.Request) {
