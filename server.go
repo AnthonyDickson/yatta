@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"embed"
 	"fmt"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -37,6 +40,11 @@ func (s *Server) getCoffee(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTeapot)
 }
 
+var (
+	//go:embed "templates/*"
+	todosListTemplate embed.FS
+)
+
 func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
 	user := r.PathValue("user")
 	todos := s.store.GetTodos(user)
@@ -46,13 +54,31 @@ func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Add("content-type", htmlContentType)
-	// TODO: Render HTML with templates
-	fmt.Fprint(w, "<ul>")
-	for _, todo := range todos {
-		fmt.Fprintf(w, "<li>%s</li>", todo)
+	// TODO: Parse templates once in constructor.
+	tmpl, err := template.ParseFS(todosListTemplate, "templates/*.html")
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error(fmt.Sprintf("an error occurred while parsing the template for the route %q: %v", r.URL, err))
+		return
 	}
-	fmt.Fprint(w, "</ul>")
+
+	// TODO: Separate out rendering logic and error handling.
+
+	body := new(bytes.Buffer)
+
+	if err := tmpl.ExecuteTemplate(body, "todo_list.html", todos); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error(fmt.Sprintf("an error occurred while rendering the template for the route %q with data %q: %v", r.URL, todos, err))
+		return
+	}
+
+	w.Header().Add("content-type", htmlContentType)
+	_, err = w.Write(body.Bytes())
+
+	if err != nil {
+		slog.Error(fmt.Sprintf("an error occurred while writing the response body: %v", err))
+	}
 }
 
 func (s *Server) addTodo(w http.ResponseWriter, r *http.Request) {
