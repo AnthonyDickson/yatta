@@ -10,8 +10,7 @@ import (
 
 func TestCreateAndGetTodo(t *testing.T) {
 	store := yatta.NewInMemoryTodoStore()
-	server := yatta.NewServer(store)
-
+	server := mustCreateServer(t, store)
 	user := "Pierre"
 	tasks := []string{"write a book", "philosophise"}
 

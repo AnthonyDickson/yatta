@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"embed"
 	"fmt"
-	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,11 +15,12 @@ type TodoStore interface {
 }
 
 type Server struct {
-	store TodoStore
+	store    TodoStore
+	renderer Renderer
 	http.Handler
 }
 
-func NewServer(store TodoStore) *Server {
+func NewServer(store TodoStore) (*Server, error) {
 	server := new(Server)
 	server.store = store
 
@@ -33,17 +31,20 @@ func NewServer(store TodoStore) *Server {
 
 	server.Handler = router
 
-	return server
+	renderer, err := NewRenderer()
+
+	if err != nil {
+		return nil, fmt.Errorf("an error occurred while creating the template renderer: %v", err)
+	}
+
+	server.renderer = *renderer
+
+	return server, nil
 }
 
 func (s *Server) getCoffee(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTeapot)
 }
-
-var (
-	//go:embed "templates/*"
-	todosListTemplate embed.FS
-)
 
 func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
 	user := r.PathValue("user")
@@ -54,29 +55,17 @@ func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Parse templates once in constructor.
-	tmpl, err := template.ParseFS(todosListTemplate, "templates/*.html")
+	body, err := s.renderer.RenderTodosList(todos)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("an error occurred while parsing the template for the route %q: %v", r.URL, err))
-		return
-	}
-
-	// TODO: Separate out rendering logic and error handling.
-
-	body := new(bytes.Buffer)
-
-	if err := tmpl.ExecuteTemplate(body, "todo_list.html", todos); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("an error occurred while rendering the template for the route %q with data %q: %v", r.URL, todos, err))
+		slog.Error(fmt.Sprintf("an error occurred while rendering the template for %s: %v", r.URL, err))
 		return
 	}
 
 	w.Header().Add("content-type", htmlContentType)
-	_, err = w.Write(body.Bytes())
 
-	if err != nil {
+	if _, err := w.Write(body); err != nil {
 		slog.Error(fmt.Sprintf("an error occurred while writing the response body: %v", err))
 	}
 }

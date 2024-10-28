@@ -26,7 +26,12 @@ func (i *InMemoryTodoStore) AddTodo(user string, task string) {
 
 func main() {
 	store := NewInMemoryTodoStore()
-	server := NewServer(store)
+	server, err := NewServer(store)
+
+	if err != nil {
+		log.Fatalf("an error occurred while creating the server: %v", err)
+	}
+
 	handler := http.Handler(server)
 	log.Fatal(http.ListenAndServe(":8000", handler))
 }

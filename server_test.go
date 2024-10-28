@@ -45,7 +45,7 @@ func (s *StubTodoStore) AddTodo(user string, task string) {
 
 func TestGetCoffee(t *testing.T) {
 	t.Run("returns status 418", func(t *testing.T) {
-		server := yatta.NewServer(new(StubTodoStore))
+		server := mustCreateServer(t, new(StubTodoStore))
 
 		response := httptest.NewRecorder()
 		request := newGetCoffeeRequest(t)
@@ -64,7 +64,7 @@ func TestGetTodos(t *testing.T) {
 				"thor":  {"write more code"},
 			},
 		}
-		server := yatta.NewServer(store)
+		server := mustCreateServer(t, store)
 		return store, server
 	}
 
@@ -115,7 +115,7 @@ func TestCreateTodos(t *testing.T) {
 		store := &StubTodoStore{
 			store: map[string][]string{},
 		}
-		server := yatta.NewServer(store)
+		server := mustCreateServer(t, store)
 
 		want := addTodoCall{
 			user: "Alice",
@@ -135,7 +135,7 @@ func TestCreateTodos(t *testing.T) {
 		store := &StubTodoStore{
 			store: map[string][]string{},
 		}
-		server := yatta.NewServer(store)
+		server := mustCreateServer(t, store)
 
 		cases := []addTodoCall{
 			{"Thor", "write code"},
@@ -154,6 +154,18 @@ func TestCreateTodos(t *testing.T) {
 
 		assertAddCalls(t, store, cases)
 	})
+}
+
+func mustCreateServer(t *testing.T, store yatta.TodoStore) *yatta.Server {
+	t.Helper()
+
+	server, err := yatta.NewServer(store)
+
+	if err != nil {
+		t.Errorf("an ocurred while creating the server: %v", err)
+	}
+
+	return server
 }
 
 func newGetCoffeeRequest(t *testing.T) *http.Request {
@@ -250,6 +262,7 @@ func assertGetTodosCall(t *testing.T, store *StubTodoStore, want getTodosCall) {
 	}
 }
 
+// TODO: Replace calls to this helper with helper that checks for calls to appropriate renderer function with the correct todos list.
 func assertResponseBody(t *testing.T, response *httptest.ResponseRecorder, want []string) {
 	t.Helper()
 
@@ -264,37 +277,4 @@ func assertResponseBody(t *testing.T, response *httptest.ResponseRecorder, want 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got response body %q want %q", got, want)
 	}
-}
-
-func extractTodosFromHTML(t *testing.T, htmlFragment *html.Node) []string {
-	t.Helper()
-
-	todos := []string{}
-
-	var extractText func(*html.Node)
-	extractText = func(node *html.Node) {
-		if node.Type == html.TextNode {
-			todos = append(todos, node.Data)
-			return
-		}
-
-		for child := node.FirstChild; child != nil; child = child.NextSibling {
-			extractText(child)
-		}
-	}
-
-	var findTodos func(*html.Node)
-	findTodos = func(node *html.Node) {
-		if node.Type == html.ElementNode && node.Data == "li" {
-			extractText(node)
-		}
-
-		for child := node.FirstChild; child != nil; child = child.NextSibling {
-			findTodos(child)
-		}
-	}
-
-	findTodos(htmlFragment)
-
-	return todos
 }
