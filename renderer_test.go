@@ -26,10 +26,10 @@ func TestRenderer_TodosList(t *testing.T) {
 	})
 }
 
-func mustCreateRenderer(t *testing.T) *yatta.Renderer {
+func mustCreateRenderer(t *testing.T) *yatta.HTMLRenderer {
 	t.Helper()
 
-	renderer, err := yatta.NewRenderer()
+	renderer, err := yatta.NewHTMLRenderer()
 
 	if err != nil {
 		t.Errorf("an error occurred creating the renderer: %v", err)

@@ -31,13 +31,13 @@ func NewServer(store TodoStore) (*Server, error) {
 
 	server.Handler = router
 
-	renderer, err := NewRenderer()
+	renderer, err := NewHTMLRenderer()
 
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred while creating the template renderer: %v", err)
 	}
 
-	server.renderer = *renderer
+	server.renderer = renderer
 
 	return server, nil
 }

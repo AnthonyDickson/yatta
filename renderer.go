@@ -12,12 +12,16 @@ var (
 	todosListTemplate embed.FS
 )
 
-type Renderer struct {
+type Renderer interface {
+	RenderTodosList(todos []string) ([]byte, error)
+}
+
+type HTMLRenderer struct {
 	template *template.Template
 }
 
-func NewRenderer() (*Renderer, error) {
-	renderer := new(Renderer)
+func NewHTMLRenderer() (*HTMLRenderer, error) {
+	renderer := new(HTMLRenderer)
 
 	templatesPath := "templates/*.html"
 	tmpl, err := template.ParseFS(todosListTemplate, templatesPath)
@@ -31,7 +35,7 @@ func NewRenderer() (*Renderer, error) {
 	return renderer, nil
 }
 
-func (r *Renderer) RenderTodosList(todos []string) ([]byte, error) {
+func (r *HTMLRenderer) RenderTodosList(todos []string) ([]byte, error) {
 	body := new(bytes.Buffer)
 	templatePath := "todo_list.html"
 
