@@ -10,7 +10,8 @@ import (
 
 func TestCreateAndGetTodo(t *testing.T) {
 	store := yatta.NewInMemoryTodoStore()
-	server := mustCreateServer(t, store)
+	renderer := mustCreateRenderer(t)
+	server := mustCreateServer(t, store, renderer)
 	user := "Pierre"
 	tasks := []string{"write a book", "philosophise"}
 
@@ -22,5 +23,5 @@ func TestCreateAndGetTodo(t *testing.T) {
 	server.ServeHTTP(response, newGetTodosRequest(t, user))
 
 	assertStatus(t, response, http.StatusOK)
-	assertResponseBody(t, response, tasks)
+	assertHTMLContainsTodos(t, response.Body.String(), tasks)
 }

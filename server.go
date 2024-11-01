@@ -20,7 +20,7 @@ type Server struct {
 	http.Handler
 }
 
-func NewServer(store TodoStore) (*Server, error) {
+func NewServer(store TodoStore, renderer Renderer) (*Server, error) {
 	server := new(Server)
 	server.store = store
 
@@ -30,12 +30,6 @@ func NewServer(store TodoStore) (*Server, error) {
 	router.Handle("POST /users/{user}/todos", http.HandlerFunc(server.addTodo))
 
 	server.Handler = router
-
-	renderer, err := NewHTMLRenderer()
-
-	if err != nil {
-		return nil, fmt.Errorf("an error occurred while creating the template renderer: %v", err)
-	}
 
 	server.renderer = renderer
 

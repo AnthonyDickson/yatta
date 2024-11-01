@@ -26,7 +26,13 @@ func (i *InMemoryTodoStore) AddTodo(user string, task string) {
 
 func main() {
 	store := NewInMemoryTodoStore()
-	server, err := NewServer(store)
+	renderer, err := NewHTMLRenderer()
+
+	if err != nil {
+		log.Fatalf("an error occurred while creating the HTML renderer: %v", err)
+	}
+
+	server, err := NewServer(store, renderer)
 
 	if err != nil {
 		log.Fatalf("an error occurred while creating the server: %v", err)

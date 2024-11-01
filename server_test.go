@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	yatta "github.com/AnthonyDickson/yatta"
-	"golang.org/x/net/html"
 )
 
 const htmlContentType = "text/html"
@@ -39,13 +38,23 @@ func (s *StubTodoStore) GetTodos(user string) []string {
 	return tasks
 }
 
+type SpyRenderer struct {
+	renderTodosCalls [][]string
+}
+
+func (s *SpyRenderer) RenderTodosList(todos []string) ([]byte, error) {
+	s.renderTodosCalls = append(s.renderTodosCalls, todos)
+
+	return nil, nil
+}
+
 func (s *StubTodoStore) AddTodo(user string, task string) {
 	s.addCalls = append(s.addCalls, addTodoCall{user, task})
 }
 
 func TestGetCoffee(t *testing.T) {
 	t.Run("returns status 418", func(t *testing.T) {
-		server := mustCreateServer(t, new(StubTodoStore))
+		server := mustCreateServer(t, new(StubTodoStore), new(SpyRenderer))
 
 		response := httptest.NewRecorder()
 		request := newGetCoffeeRequest(t)
@@ -57,19 +66,22 @@ func TestGetCoffee(t *testing.T) {
 }
 
 func TestGetTodos(t *testing.T) {
-	getStoreAndServer := func() (*StubTodoStore, *yatta.Server) {
+	getStoreRendererAndServer := func() (*StubTodoStore, *SpyRenderer, *yatta.Server) {
 		store := &StubTodoStore{
 			store: map[string][]string{
 				"Alice": {"send message to Bob"},
 				"thor":  {"write more code"},
 			},
 		}
-		server := mustCreateServer(t, store)
-		return store, server
+
+		renderer := new(SpyRenderer)
+
+		server := mustCreateServer(t, store, renderer)
+		return store, renderer, server
 	}
 
 	t.Run("returns todos for Alice", func(t *testing.T) {
-		store, server := getStoreAndServer()
+		store, renderer, server := getStoreRendererAndServer()
 		want := getTodosCall{"Alice", []string{"send message to Bob"}}
 
 		request := newGetTodosRequest(t, want.user)
@@ -80,12 +92,11 @@ func TestGetTodos(t *testing.T) {
 		assertStatus(t, response, http.StatusOK)
 		assertContentType(t, response, htmlContentType)
 		assertGetTodosCall(t, store, want)
-		assertResponseBody(t, response, want.tasks)
-
+		assertRenderTodosCall(t, renderer, want.tasks)
 	})
 
 	t.Run("returns todos for thor", func(t *testing.T) {
-		store, server := getStoreAndServer()
+		store, renderer, server := getStoreRendererAndServer()
 		want := getTodosCall{"thor", []string{"write more code"}}
 
 		request := newGetTodosRequest(t, want.user)
@@ -96,11 +107,11 @@ func TestGetTodos(t *testing.T) {
 		assertStatus(t, response, http.StatusOK)
 		assertContentType(t, response, htmlContentType)
 		assertGetTodosCall(t, store, want)
-		assertResponseBody(t, response, want.tasks)
+		assertRenderTodosCall(t, renderer, want.tasks)
 	})
 
 	t.Run("returns 404 for nonexistent user", func(t *testing.T) {
-		_, server := getStoreAndServer()
+		_, _, server := getStoreRendererAndServer()
 		request := newGetTodosRequest(t, "Bob")
 		response := httptest.NewRecorder()
 
@@ -115,7 +126,7 @@ func TestCreateTodos(t *testing.T) {
 		store := &StubTodoStore{
 			store: map[string][]string{},
 		}
-		server := mustCreateServer(t, store)
+		server := mustCreateServer(t, store, new(SpyRenderer))
 
 		want := addTodoCall{
 			user: "Alice",
@@ -135,7 +146,7 @@ func TestCreateTodos(t *testing.T) {
 		store := &StubTodoStore{
 			store: map[string][]string{},
 		}
-		server := mustCreateServer(t, store)
+		server := mustCreateServer(t, store, new(SpyRenderer))
 
 		cases := []addTodoCall{
 			{"Thor", "write code"},
@@ -156,10 +167,10 @@ func TestCreateTodos(t *testing.T) {
 	})
 }
 
-func mustCreateServer(t *testing.T, store yatta.TodoStore) *yatta.Server {
+func mustCreateServer(t *testing.T, store yatta.TodoStore, renderer yatta.Renderer) *yatta.Server {
 	t.Helper()
 
-	server, err := yatta.NewServer(store)
+	server, err := yatta.NewServer(store, renderer)
 
 	if err != nil {
 		t.Errorf("an ocurred while creating the server: %v", err)
@@ -262,19 +273,16 @@ func assertGetTodosCall(t *testing.T, store *StubTodoStore, want getTodosCall) {
 	}
 }
 
-// TODO: Replace calls to this helper with helper that checks for calls to appropriate renderer function with the correct todos list.
-func assertResponseBody(t *testing.T, response *httptest.ResponseRecorder, want []string) {
+func assertRenderTodosCall(t *testing.T, renderer *SpyRenderer, want []string) {
 	t.Helper()
 
-	doc, err := html.Parse(response.Body)
-
-	if err != nil {
-		t.Fatalf("a problem ocurred while decoding the response body as HTML: %v", err)
+	if len(renderer.renderTodosCalls) != 1 {
+		t.Fatalf("got %d calls to RenderTodosList, want 1", len(renderer.renderTodosCalls))
 	}
 
-	got := extractTodosFromHTML(t, doc)
+	got := renderer.renderTodosCalls[0]
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got response body %q want %q", got, want)
+		t.Errorf("got calls to RenderTodosList %q, want %q", got, want)
 	}
 }
