@@ -9,11 +9,6 @@ import (
 
 const htmlContentType = "text/html"
 
-type TodoStore interface {
-	GetTodos(user string) []string
-	AddTodo(user string, task string)
-}
-
 type Server struct {
 	store    TodoStore
 	renderer Renderer
