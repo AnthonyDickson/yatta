@@ -37,7 +37,13 @@ func (s *Server) getCoffee(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
 	user := r.PathValue("user")
-	todos := s.store.GetTodos(user)
+	todos, err := s.store.GetTodos(user)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error(fmt.Sprintf("an error occurred while getting the todos for %s: %v", r.URL, err))
+		return
+	}
 
 	if todos == nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -71,6 +77,13 @@ func (s *Server) addTodo(w http.ResponseWriter, r *http.Request) {
 
 	task := string(bodyBytes)
 
-	s.store.AddTodo(user, task)
+	err = s.store.AddTodo(user, task)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error(fmt.Sprintf("could not add todo %q for user %q: %v", user, task, err))
+		return
+	}
+
 	w.WriteHeader(http.StatusAccepted)
 }

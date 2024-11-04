@@ -16,12 +16,14 @@ func NewInMemoryTodoStore() *InMemoryTodoStore {
 	return store
 }
 
-func (i *InMemoryTodoStore) GetTodos(user string) []string {
-	return i.todos[user]
+func (i *InMemoryTodoStore) GetTodos(user string) ([]string, error) {
+	return i.todos[user], nil
 }
 
-func (i *InMemoryTodoStore) AddTodo(user string, task string) {
+func (i *InMemoryTodoStore) AddTodo(user string, task string) error {
 	i.todos[user] = append(i.todos[user], task)
+
+	return nil
 }
 
 func main() {

@@ -30,12 +30,12 @@ type StubTodoStore struct {
 	getTodosCalls []getTodosCall
 }
 
-func (s *StubTodoStore) GetTodos(user string) []string {
+func (s *StubTodoStore) GetTodos(user string) ([]string, error) {
 	tasks := s.store[user]
 
 	s.getTodosCalls = append(s.getTodosCalls, getTodosCall{user, tasks})
 
-	return tasks
+	return tasks, nil
 }
 
 type SpyRenderer struct {
@@ -48,8 +48,10 @@ func (s *SpyRenderer) RenderTodosList(todos []string) ([]byte, error) {
 	return nil, nil
 }
 
-func (s *StubTodoStore) AddTodo(user string, task string) {
+func (s *StubTodoStore) AddTodo(user string, task string) error {
 	s.addCalls = append(s.addCalls, addTodoCall{user, task})
+
+	return nil
 }
 
 func TestGetCoffee(t *testing.T) {
