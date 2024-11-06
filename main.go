@@ -3,31 +3,19 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 )
 
-type InMemoryTodoStore struct {
-	todos map[string][]string
-}
-
-func NewInMemoryTodoStore() *InMemoryTodoStore {
-	store := new(InMemoryTodoStore)
-	store.todos = make(map[string][]string)
-
-	return store
-}
-
-func (i *InMemoryTodoStore) GetTodos(user string) ([]string, error) {
-	return i.todos[user], nil
-}
-
-func (i *InMemoryTodoStore) AddTodo(user string, task string) error {
-	i.todos[user] = append(i.todos[user], task)
-
-	return nil
-}
+const dbFileName = "todos.db.json"
 
 func main() {
-	store := NewInMemoryTodoStore()
+	database, err := os.OpenFile(dbFileName, os.O_RDWR|os.O_CREATE, 0666)
+
+	if err != nil {
+		log.Fatalf("could not open file %s: %v", dbFileName, err)
+	}
+
+	store := NewFileTodoStore(database)
 	renderer, err := NewHTMLRenderer()
 
 	if err != nil {

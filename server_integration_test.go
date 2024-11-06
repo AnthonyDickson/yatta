@@ -9,7 +9,10 @@ import (
 )
 
 func TestCreateAndGetTodo(t *testing.T) {
-	store := yatta.NewInMemoryTodoStore()
+	database, cleanup := createTempFile(t, "")
+	defer cleanup()
+
+	store := yatta.NewFileTodoStore(database)
 	renderer := mustCreateRenderer(t)
 	server := mustCreateServer(t, store, renderer)
 	user := "Pierre"

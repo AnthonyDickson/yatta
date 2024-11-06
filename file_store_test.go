@@ -1,7 +1,6 @@
 package main_test
 
 import (
-	"io"
 	"os"
 	"reflect"
 	"testing"
@@ -85,7 +84,7 @@ func assertTodos(t *testing.T, store *yatta.FileTodoStore, user string, want []s
 	}
 }
 
-func createTempFile(t *testing.T, initialData string) (io.ReadWriteSeeker, func()) {
+func createTempFile(t *testing.T, initialData string) (*os.File, func()) {
 	t.Helper()
 
 	tempFile, err := os.CreateTemp("", "db")
