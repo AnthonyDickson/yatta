@@ -26,5 +26,5 @@ func TestCreateAndGetTasks(t *testing.T) {
 	server.ServeHTTP(response, newGetTasksRequest(t, user))
 
 	assertStatus(t, response, http.StatusOK)
-	assertHTMLContainsTasks(t, response.Body.String(), tasks)
+	assertHTMLContainsTasks(t, response.Body.String(), tasks, "li")
 }

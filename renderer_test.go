@@ -22,7 +22,22 @@ func TestRenderer_TasksList(t *testing.T) {
 		htmlString, err := renderer.RenderTaskList(want)
 
 		assertNoError(t, err)
-		assertHTMLContainsTasks(t, string(htmlString), want)
+		assertHTMLContainsTasks(t, string(htmlString), want, "li")
+	})
+}
+
+func TestRenderer_Task(t *testing.T) {
+	renderer := mustCreateRenderer(t)
+
+	t.Run("renders task", func(t *testing.T) {
+		want := []yatta.Task{
+			{ID: 0, Description: "eat"},
+		}
+
+		htmlString, err := renderer.RenderTask(want[0])
+
+		assertNoError(t, err)
+		assertHTMLContainsTasks(t, string(htmlString), want, "p")
 	})
 }
 
@@ -46,7 +61,7 @@ func assertNoError(t *testing.T, err error) {
 	}
 }
 
-func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []yatta.Task) {
+func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []yatta.Task, containerTag string) {
 	t.Helper()
 
 	doc, err := html.Parse(strings.NewReader(htmlString))
@@ -55,7 +70,7 @@ func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []yatta.Task
 		t.Fatalf("an error occurred while parsing the HTML string: %v", err)
 	}
 
-	got := extractTasksFromHTML(t, doc)
+	got := extractTasksFromHTML(t, doc, containerTag)
 
 	var want []string
 
@@ -68,7 +83,7 @@ func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []yatta.Task
 	}
 }
 
-func extractTasksFromHTML(t *testing.T, htmlFragment *html.Node) []string {
+func extractTasksFromHTML(t *testing.T, htmlFragment *html.Node, containerTag string) []string {
 	t.Helper()
 
 	tasks := []string{}
@@ -87,7 +102,7 @@ func extractTasksFromHTML(t *testing.T, htmlFragment *html.Node) []string {
 
 	var findTasks func(*html.Node)
 	findTasks = func(node *html.Node) {
-		if node.Type == html.ElementNode && node.Data == "li" {
+		if node.Type == html.ElementNode && node.Data == containerTag {
 			extractText(node)
 		}
 

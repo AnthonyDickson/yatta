@@ -24,10 +24,16 @@ type getTasksCall struct {
 	tasks []yatta.Task
 }
 
+type getTaskCall struct {
+	id   uint64
+	task yatta.Task
+}
+
 type StubTaskStore struct {
 	store         map[string][]yatta.Task
 	addCalls      []addTaskCall
 	getTasksCalls []getTasksCall
+	getTaskCalls  []getTaskCall
 }
 
 func (s *StubTaskStore) GetTasks(user string) ([]yatta.Task, error) {
@@ -38,12 +44,34 @@ func (s *StubTaskStore) GetTasks(user string) ([]yatta.Task, error) {
 	return tasks, nil
 }
 
+func (s *StubTaskStore) GetTask(id uint64) (yatta.Task, error) {
+	for _, tasks := range s.store {
+		for _, task := range tasks {
+			if task.ID == id {
+				s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: task})
+				return task, nil
+			}
+		}
+	}
+
+	task := yatta.Task{ID: 0, Description: ""}
+	s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: task})
+	return task, nil
+}
+
 type SpyRenderer struct {
 	renderTasksCalls [][]yatta.Task
+	renderTaskCalls  []yatta.Task
 }
 
 func (s *SpyRenderer) RenderTaskList(tasks []yatta.Task) ([]byte, error) {
 	s.renderTasksCalls = append(s.renderTasksCalls, tasks)
+
+	return nil, nil
+}
+
+func (s *SpyRenderer) RenderTask(task yatta.Task) ([]byte, error) {
+	s.renderTaskCalls = append(s.renderTaskCalls, task)
 
 	return nil, nil
 }
@@ -120,6 +148,32 @@ func TestGetTasks(t *testing.T) {
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusNotFound)
+	})
+}
+
+func TestGetTask(t *testing.T) {
+	t.Run("get task by id", func(t *testing.T) {
+		want := []yatta.Task{
+			{ID: 0, Description: "write more tasks"},
+			{ID: 1, Description: "stop writing too many tasks"},
+		}
+
+		store := &StubTaskStore{
+			store: map[string][]yatta.Task{
+				"Alice": want,
+			},
+		}
+		renderer := new(SpyRenderer)
+		server := mustCreateServer(t, store, renderer)
+
+		request, _ := http.NewRequest(http.MethodGet, "/tasks/0", nil)
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusOK)
+		assertContentType(t, response, htmlContentType)
+		assertGetTaskCall(t, store, want[0])
+		assertRenderTaskCall(t, renderer, want[0])
 	})
 }
 
@@ -286,5 +340,33 @@ func assertRenderTasksCall(t *testing.T, renderer *SpyRenderer, want []yatta.Tas
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got calls to RenderTasksList %q, want %q", got, want)
+	}
+}
+
+func assertGetTaskCall(t *testing.T, store *StubTaskStore, want yatta.Task) {
+	t.Helper()
+
+	if len(store.getTaskCalls) != 1 {
+		t.Fatalf("got %d calls to GetTask, want 1", len(store.getTaskCalls))
+	}
+
+	got := store.getTaskCalls[0]
+
+	if got.task != want {
+		t.Errorf("got task %v want %v", got, want)
+	}
+}
+
+func assertRenderTaskCall(t *testing.T, renderer *SpyRenderer, want yatta.Task) {
+	t.Helper()
+
+	if len(renderer.renderTaskCalls) != 1 {
+		t.Fatalf("got %d calls to RenderTask, want 1", len(renderer.renderTaskCalls))
+	}
+
+	got := renderer.renderTaskCalls[0]
+
+	if got != want {
+		t.Errorf("got call to RenderTask with task %q, want call with task %q", got, want)
 	}
 }

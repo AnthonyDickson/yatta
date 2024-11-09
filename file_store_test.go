@@ -42,6 +42,26 @@ func TestFileTaskStore(t *testing.T) {
 		})
 	})
 
+	t.Run("get a task by id", func(t *testing.T) {
+		database, cleanup := createTempFile(t, `[
+        {
+          "user": "Alice", 
+          "tasks": [
+            {"ID": 0, "Description": "send message to Bob"},
+            {"ID": 1, "Description": "upgrade encryption"},
+            {"ID": 2, "Description": "read message from Bob"}
+          ]
+        }
+      ]`)
+		defer cleanup()
+
+		store := yatta.NewFileTaskStore(database)
+
+		assertGetTask(t, store, 0, yatta.Task{ID: 0, Description: "send message to Bob"})
+		assertGetTask(t, store, 1, yatta.Task{ID: 1, Description: "upgrade encryption"})
+		assertGetTask(t, store, 2, yatta.Task{ID: 2, Description: "read message from Bob"})
+	})
+
 	t.Run("add task for existing user", func(t *testing.T) {
 		database, cleanup := createTempFile(t, `[
         {
@@ -68,6 +88,17 @@ func TestFileTaskStore(t *testing.T) {
 		assertNoError(t, err)
 		assertTasks(t, store, "Alice", []yatta.Task{{ID: 0, Description: "find the keys"}})
 	})
+}
+
+func assertGetTask(t *testing.T, store *yatta.FileTaskStore, id uint64, want yatta.Task) {
+	t.Helper()
+
+	got, err := store.GetTask(id)
+	assertNoError(t, err)
+
+	if got != want {
+		t.Errorf("got task %v want %v", got, want)
+	}
 }
 
 func assertTasks(t *testing.T, store *yatta.FileTaskStore, user string, want []yatta.Task) {

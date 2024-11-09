@@ -14,6 +14,7 @@ var (
 
 type Renderer interface {
 	RenderTaskList(tasks []Task) ([]byte, error)
+	RenderTask(task Task) ([]byte, error)
 }
 
 type HTMLRenderer struct {
@@ -41,6 +42,17 @@ func (r *HTMLRenderer) RenderTaskList(tasks []Task) ([]byte, error) {
 
 	if err := r.template.ExecuteTemplate(body, templatePath, tasks); err != nil {
 		return nil, fmt.Errorf("an error occurred while rendering the template for the template %q with data %q: %v", templatePath, tasks, err)
+	}
+
+	return body.Bytes(), nil
+}
+
+func (r *HTMLRenderer) RenderTask(task Task) ([]byte, error) {
+	body := new(bytes.Buffer)
+	templatePath := "task.html"
+
+	if err := r.template.ExecuteTemplate(body, templatePath, task); err != nil {
+		return nil, fmt.Errorf("an error occurred while rendering the template for the template %q with data %q: %v", templatePath, task, err)
 	}
 
 	return body.Bytes(), nil
