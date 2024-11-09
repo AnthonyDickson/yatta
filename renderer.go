@@ -9,11 +9,11 @@ import (
 
 var (
 	//go:embed "templates/*"
-	todosListTemplate embed.FS
+	taskListTemplate embed.FS
 )
 
 type Renderer interface {
-	RenderTodosList(todos []Task) ([]byte, error)
+	RenderTaskList(tasks []Task) ([]byte, error)
 }
 
 type HTMLRenderer struct {
@@ -24,7 +24,7 @@ func NewHTMLRenderer() (*HTMLRenderer, error) {
 	renderer := new(HTMLRenderer)
 
 	templatesPath := "templates/*.html"
-	tmpl, err := template.ParseFS(todosListTemplate, templatesPath)
+	tmpl, err := template.ParseFS(taskListTemplate, templatesPath)
 
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred while parsing the templates at %s: %v", templatesPath, err)
@@ -35,12 +35,12 @@ func NewHTMLRenderer() (*HTMLRenderer, error) {
 	return renderer, nil
 }
 
-func (r *HTMLRenderer) RenderTodosList(todos []Task) ([]byte, error) {
+func (r *HTMLRenderer) RenderTaskList(tasks []Task) ([]byte, error) {
 	body := new(bytes.Buffer)
-	templatePath := "todo_list.html"
+	templatePath := "task_list.html"
 
-	if err := r.template.ExecuteTemplate(body, templatePath, todos); err != nil {
-		return nil, fmt.Errorf("an error occurred while rendering the template for the template %q with data %q: %v", templatePath, todos, err)
+	if err := r.template.ExecuteTemplate(body, templatePath, tasks); err != nil {
+		return nil, fmt.Errorf("an error occurred while rendering the template for the template %q with data %q: %v", templatePath, tasks, err)
 	}
 
 	return body.Bytes(), nil

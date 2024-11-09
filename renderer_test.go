@@ -9,20 +9,20 @@ import (
 	"golang.org/x/net/html"
 )
 
-func TestRenderer_TodosList(t *testing.T) {
+func TestRenderer_TasksList(t *testing.T) {
 	renderer := mustCreateRenderer(t)
 
-	t.Run("renders todos list", func(t *testing.T) {
+	t.Run("renders tasks list", func(t *testing.T) {
 		want := []yatta.Task{
 			{ID: 0, Description: "eat"},
 			{ID: 1, Description: "sleep"},
 			{ID: 2, Description: "debug tests 🙃"},
 		}
 
-		htmlString, err := renderer.RenderTodosList(want)
+		htmlString, err := renderer.RenderTaskList(want)
 
 		assertNoError(t, err)
-		assertHTMLContainsTodos(t, string(htmlString), want)
+		assertHTMLContainsTasks(t, string(htmlString), want)
 	})
 }
 
@@ -42,11 +42,11 @@ func assertNoError(t *testing.T, err error) {
 	t.Helper()
 
 	if err != nil {
-		t.Fatalf("an error occurred while rendering the todo list: %v", err)
+		t.Fatalf("an error occurred while rendering the task list: %v", err)
 	}
 }
 
-func assertHTMLContainsTodos(t *testing.T, htmlString string, tasks []yatta.Task) {
+func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []yatta.Task) {
 	t.Helper()
 
 	doc, err := html.Parse(strings.NewReader(htmlString))
@@ -55,7 +55,7 @@ func assertHTMLContainsTodos(t *testing.T, htmlString string, tasks []yatta.Task
 		t.Fatalf("an error occurred while parsing the HTML string: %v", err)
 	}
 
-	got := extractTodosFromHTML(t, doc)
+	got := extractTasksFromHTML(t, doc)
 
 	var want []string
 
@@ -64,19 +64,19 @@ func assertHTMLContainsTodos(t *testing.T, htmlString string, tasks []yatta.Task
 	}
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got todo list %q want %q", got, want)
+		t.Errorf("got task list %q want %q", got, want)
 	}
 }
 
-func extractTodosFromHTML(t *testing.T, htmlFragment *html.Node) []string {
+func extractTasksFromHTML(t *testing.T, htmlFragment *html.Node) []string {
 	t.Helper()
 
-	todos := []string{}
+	tasks := []string{}
 
 	var extractText func(*html.Node)
 	extractText = func(node *html.Node) {
 		if node.Type == html.TextNode {
-			todos = append(todos, node.Data)
+			tasks = append(tasks, node.Data)
 			return
 		}
 
@@ -85,18 +85,18 @@ func extractTodosFromHTML(t *testing.T, htmlFragment *html.Node) []string {
 		}
 	}
 
-	var findTodos func(*html.Node)
-	findTodos = func(node *html.Node) {
+	var findTasks func(*html.Node)
+	findTasks = func(node *html.Node) {
 		if node.Type == html.ElementNode && node.Data == "li" {
 			extractText(node)
 		}
 
 		for child := node.FirstChild; child != nil; child = child.NextSibling {
-			findTodos(child)
+			findTasks(child)
 		}
 	}
 
-	findTodos(htmlFragment)
+	findTasks(htmlFragment)
 
-	return todos
+	return tasks
 }

@@ -15,7 +15,7 @@ func main() {
 		log.Fatalf("could not open file %s: %v", dbFileName, err)
 	}
 
-	store := NewFileTodoStore(database)
+	store := NewFileTaskStore(database)
 	renderer, err := NewHTMLRenderer()
 
 	if err != nil {

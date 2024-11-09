@@ -1,7 +1,7 @@
 package main
 
-// Handles the creation and retrieval of todos.
-type TodoStore interface {
-	GetTodos(user string) ([]Task, error)
-	AddTodo(user string, description string) error
+// Handles the creation and retrieval of tasks.
+type TaskStore interface {
+	GetTasks(user string) ([]Task, error)
+	AddTask(user string, description string) error
 }

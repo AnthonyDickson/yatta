@@ -7,63 +7,63 @@ import (
 	"os"
 )
 
-// Persists todos to disk.
-type FileTodoStore struct {
+// Persists tasks to disk.
+type FileTaskStore struct {
 	database *os.File
 }
 
-func NewFileTodoStore(database *os.File) *FileTodoStore {
-	return &FileTodoStore{database: database}
+func NewFileTaskStore(database *os.File) *FileTaskStore {
+	return &FileTaskStore{database: database}
 }
 
-func (f *FileTodoStore) GetTodos(user string) ([]Task, error) {
-	todoLists, err := f.getTodoLists()
+func (f *FileTaskStore) GetTasks(user string) ([]Task, error) {
+	taskLists, err := f.getTaskLists()
 
 	if err != nil {
-		return nil, fmt.Errorf("could not get todos: %v", err)
+		return nil, fmt.Errorf("could not get tasks: %v", err)
 	}
 
-	todoList := todoLists.find(user)
+	taskList := taskLists.find(user)
 
-	if todoList != nil {
-		return todoList.Tasks, nil
+	if taskList != nil {
+		return taskList.Tasks, nil
 	}
 
 	return nil, nil
 }
 
-func (f *FileTodoStore) AddTodo(user string, description string) error {
-	todoLists, err := f.getTodoLists()
+func (f *FileTaskStore) AddTask(user string, description string) error {
+	taskLists, err := f.getTaskLists()
 
 	if err != nil {
-		return fmt.Errorf("could not get todos: %v", err)
+		return fmt.Errorf("could not get tasks: %v", err)
 	}
 
-	userTodoList := todoLists.find(user)
-	todo := Task{ID: 0, Description: description}
+	userTaskList := taskLists.find(user)
+	task := Task{ID: 0, Description: description}
 
-	if userTodoList != nil {
-		userTodoList.Tasks = append(userTodoList.Tasks, todo)
+	if userTaskList != nil {
+		userTaskList.Tasks = append(userTaskList.Tasks, task)
 	} else {
-		*todoLists = append(*todoLists, todoList{user, []Task{todo}})
+		*taskLists = append(*taskLists, taskList{user, []Task{task}})
 	}
 
-	return f.updateDatabase(todoLists)
+	return f.updateDatabase(taskLists)
 }
 
-func (f *FileTodoStore) getTodoLists() (*todoLists, error) {
+func (f *FileTaskStore) getTaskLists() (*taskLists, error) {
 	_, err := f.database.Seek(0, io.SeekStart)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not seek to the start of the database file: %v", err)
 	}
 
-	todoLists, err := newTodoLists(f.database)
+	taskLists, err := newTaskLists(f.database)
 
-	return &todoLists, err
+	return &taskLists, err
 }
 
-func (f *FileTodoStore) updateDatabase(todoLists *todoLists) error {
+func (f *FileTaskStore) updateDatabase(taskLists *taskLists) error {
 	err := f.database.Truncate(0) // prevents writes that are smaller than previous file from leading to invalid JSON
 
 	if err != nil {
@@ -76,21 +76,21 @@ func (f *FileTodoStore) updateDatabase(todoLists *todoLists) error {
 		return fmt.Errorf("could not seek database file: %v", err)
 	}
 
-	err = json.NewEncoder(f.database).Encode(todoLists)
+	err = json.NewEncoder(f.database).Encode(taskLists)
 
 	return err
 }
 
-// A list of todos for a user.
-type todoList struct {
+// A list of tasks for a user.
+type taskList struct {
 	User  string
 	Tasks []Task
 }
 
-type todoLists []todoList
+type taskLists []taskList
 
-// Parse a list of todosList objects from `database`.
-func newTodoLists(database *os.File) (todoLists, error) {
+// Parse a list of tasksList objects from `database`.
+func newTaskLists(database *os.File) (taskLists, error) {
 	data, err := io.ReadAll(database)
 
 	if err != nil {
@@ -102,21 +102,21 @@ func newTodoLists(database *os.File) (todoLists, error) {
 		return nil, nil
 	}
 
-	var todos todoLists
-	err = json.Unmarshal(data, &todos)
+	var tasks taskLists
+	err = json.Unmarshal(data, &tasks)
 
 	if err != nil {
-		return nil, fmt.Errorf("could not decode the todo store %s: %v", data, err)
+		return nil, fmt.Errorf("could not decode the task store %s: %v", data, err)
 	}
 
-	return todos, nil
+	return tasks, nil
 }
 
-// Search a `todoLists` for the todos for `user`.
+// Search a `taskLists` for the tasks for `user`.
 // Returns `nil` if not found.
-func (t todoLists) find(user string) *todoList {
-	for i, todoList := range t {
-		if todoList.User == user {
+func (t taskLists) find(user string) *taskList {
+	for i, taskList := range t {
+		if taskList.User == user {
 			return &t[i]
 		}
 	}

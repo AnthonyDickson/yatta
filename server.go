@@ -10,19 +10,19 @@ import (
 const htmlContentType = "text/html"
 
 type Server struct {
-	store    TodoStore
+	store    TaskStore
 	renderer Renderer
 	http.Handler
 }
 
-func NewServer(store TodoStore, renderer Renderer) (*Server, error) {
+func NewServer(store TaskStore, renderer Renderer) (*Server, error) {
 	server := new(Server)
 	server.store = store
 
 	router := http.NewServeMux()
 	router.Handle("GET /coffee", http.HandlerFunc(server.getCoffee))
-	router.Handle("GET /users/{user}/todos", http.HandlerFunc(server.getTodos))
-	router.Handle("POST /users/{user}/todos", http.HandlerFunc(server.addTodo))
+	router.Handle("GET /users/{user}/tasks", http.HandlerFunc(server.getTasks))
+	router.Handle("POST /users/{user}/tasks", http.HandlerFunc(server.addTask))
 
 	server.Handler = router
 
@@ -35,22 +35,22 @@ func (s *Server) getCoffee(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTeapot)
 }
 
-func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getTasks(w http.ResponseWriter, r *http.Request) {
 	user := r.PathValue("user")
-	todos, err := s.store.GetTodos(user)
+	tasks, err := s.store.GetTasks(user)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("an error occurred while getting the todos for %s: %v", r.URL, err))
+		slog.Error(fmt.Sprintf("an error occurred while getting the tasks for %s: %v", r.URL, err))
 		return
 	}
 
-	if todos == nil {
+	if tasks == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	body, err := s.renderer.RenderTodosList(todos)
+	body, err := s.renderer.RenderTaskList(tasks)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -65,7 +65,7 @@ func (s *Server) getTodos(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) addTodo(w http.ResponseWriter, r *http.Request) {
+func (s *Server) addTask(w http.ResponseWriter, r *http.Request) {
 	user := r.PathValue("user")
 	bodyBytes, err := io.ReadAll(r.Body)
 
@@ -77,11 +77,11 @@ func (s *Server) addTodo(w http.ResponseWriter, r *http.Request) {
 
 	task := string(bodyBytes)
 
-	err = s.store.AddTodo(user, task)
+	err = s.store.AddTask(user, task)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("could not add todo %q for user %q: %v", user, task, err))
+		slog.Error(fmt.Sprintf("could not add task %q for user %q: %v", user, task, err))
 		return
 	}
 

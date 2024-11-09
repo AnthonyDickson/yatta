@@ -14,49 +14,49 @@ import (
 
 const htmlContentType = "text/html"
 
-type addTodoCall struct {
+type addTaskCall struct {
 	user string
 	task string
 }
 
-type getTodosCall struct {
+type getTasksCall struct {
 	user  string
 	tasks []yatta.Task
 }
 
-type StubTodoStore struct {
+type StubTaskStore struct {
 	store         map[string][]yatta.Task
-	addCalls      []addTodoCall
-	getTodosCalls []getTodosCall
+	addCalls      []addTaskCall
+	getTasksCalls []getTasksCall
 }
 
-func (s *StubTodoStore) GetTodos(user string) ([]yatta.Task, error) {
+func (s *StubTaskStore) GetTasks(user string) ([]yatta.Task, error) {
 	tasks := s.store[user]
 
-	s.getTodosCalls = append(s.getTodosCalls, getTodosCall{user, tasks})
+	s.getTasksCalls = append(s.getTasksCalls, getTasksCall{user, tasks})
 
 	return tasks, nil
 }
 
 type SpyRenderer struct {
-	renderTodosCalls [][]yatta.Task
+	renderTasksCalls [][]yatta.Task
 }
 
-func (s *SpyRenderer) RenderTodosList(todos []yatta.Task) ([]byte, error) {
-	s.renderTodosCalls = append(s.renderTodosCalls, todos)
+func (s *SpyRenderer) RenderTaskList(tasks []yatta.Task) ([]byte, error) {
+	s.renderTasksCalls = append(s.renderTasksCalls, tasks)
 
 	return nil, nil
 }
 
-func (s *StubTodoStore) AddTodo(user string, task string) error {
-	s.addCalls = append(s.addCalls, addTodoCall{user, task})
+func (s *StubTaskStore) AddTask(user string, task string) error {
+	s.addCalls = append(s.addCalls, addTaskCall{user, task})
 
 	return nil
 }
 
 func TestGetCoffee(t *testing.T) {
 	t.Run("returns status 418", func(t *testing.T) {
-		server := mustCreateServer(t, new(StubTodoStore), new(SpyRenderer))
+		server := mustCreateServer(t, new(StubTaskStore), new(SpyRenderer))
 
 		response := httptest.NewRecorder()
 		request := newGetCoffeeRequest(t)
@@ -67,9 +67,9 @@ func TestGetCoffee(t *testing.T) {
 	})
 }
 
-func TestGetTodos(t *testing.T) {
-	getStoreRendererAndServer := func() (*StubTodoStore, *SpyRenderer, *yatta.Server) {
-		store := &StubTodoStore{
+func TestGetTasks(t *testing.T) {
+	getStoreRendererAndServer := func() (*StubTaskStore, *SpyRenderer, *yatta.Server) {
+		store := &StubTaskStore{
 			store: map[string][]yatta.Task{
 				"Alice": {{ID: 0, Description: "send message to Bob"}},
 				"thor":  {{ID: 1, Description: "write more code"}},
@@ -82,39 +82,39 @@ func TestGetTodos(t *testing.T) {
 		return store, renderer, server
 	}
 
-	t.Run("returns todos for Alice", func(t *testing.T) {
+	t.Run("returns tasks for Alice", func(t *testing.T) {
 		store, renderer, server := getStoreRendererAndServer()
-		want := getTodosCall{"Alice", []yatta.Task{{ID: 0, Description: "send message to Bob"}}}
+		want := getTasksCall{"Alice", []yatta.Task{{ID: 0, Description: "send message to Bob"}}}
 
-		request := newGetTodosRequest(t, want.user)
+		request := newGetTasksRequest(t, want.user)
 		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusOK)
 		assertContentType(t, response, htmlContentType)
-		assertGetTodosCall(t, store, want)
-		assertRenderTodosCall(t, renderer, want.tasks)
+		assertGetTasksCall(t, store, want)
+		assertRenderTasksCall(t, renderer, want.tasks)
 	})
 
-	t.Run("returns todos for thor", func(t *testing.T) {
+	t.Run("returns tasks for thor", func(t *testing.T) {
 		store, renderer, server := getStoreRendererAndServer()
-		want := getTodosCall{"thor", []yatta.Task{{ID: 1, Description: "write more code"}}}
+		want := getTasksCall{"thor", []yatta.Task{{ID: 1, Description: "write more code"}}}
 
-		request := newGetTodosRequest(t, want.user)
+		request := newGetTasksRequest(t, want.user)
 		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusOK)
 		assertContentType(t, response, htmlContentType)
-		assertGetTodosCall(t, store, want)
-		assertRenderTodosCall(t, renderer, want.tasks)
+		assertGetTasksCall(t, store, want)
+		assertRenderTasksCall(t, renderer, want.tasks)
 	})
 
 	t.Run("returns 404 for nonexistent user", func(t *testing.T) {
 		_, _, server := getStoreRendererAndServer()
-		request := newGetTodosRequest(t, "Bob")
+		request := newGetTasksRequest(t, "Bob")
 		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
@@ -123,41 +123,41 @@ func TestGetTodos(t *testing.T) {
 	})
 }
 
-func TestCreateTodos(t *testing.T) {
-	t.Run("creates todo on POST", func(t *testing.T) {
-		store := &StubTodoStore{
+func TestCreateTasks(t *testing.T) {
+	t.Run("creates task on POST", func(t *testing.T) {
+		store := &StubTaskStore{
 			store: map[string][]yatta.Task{},
 		}
 		server := mustCreateServer(t, store, new(SpyRenderer))
 
-		want := addTodoCall{
+		want := addTaskCall{
 			user: "Alice",
 			task: "encrypt messages",
 		}
 
-		request := newCreateTodosRequest(t, want.user, want.task)
+		request := newCreateTasksRequest(t, want.user, want.task)
 		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusAccepted)
-		assertAddCalls(t, store, []addTodoCall{want})
+		assertAddCalls(t, store, []addTaskCall{want})
 	})
 
-	t.Run("create multiple todos", func(t *testing.T) {
-		store := &StubTodoStore{
+	t.Run("create multiple tasks", func(t *testing.T) {
+		store := &StubTaskStore{
 			store: map[string][]yatta.Task{},
 		}
 		server := mustCreateServer(t, store, new(SpyRenderer))
 
-		cases := []addTodoCall{
+		cases := []addTaskCall{
 			{"Thor", "write code"},
 			{"Thor", "debug code"},
 			{"Thor", "fix code"},
 		}
 
 		for _, want := range cases {
-			request := newCreateTodosRequest(t, want.user, want.task)
+			request := newCreateTasksRequest(t, want.user, want.task)
 			response := httptest.NewRecorder()
 
 			server.ServeHTTP(response, request)
@@ -169,7 +169,7 @@ func TestCreateTodos(t *testing.T) {
 	})
 }
 
-func mustCreateServer(t *testing.T, store yatta.TodoStore, renderer yatta.Renderer) *yatta.Server {
+func mustCreateServer(t *testing.T, store yatta.TaskStore, renderer yatta.Renderer) *yatta.Server {
 	t.Helper()
 
 	server, err := yatta.NewServer(store, renderer)
@@ -193,22 +193,22 @@ func newGetCoffeeRequest(t *testing.T) *http.Request {
 	return request
 }
 
-func newGetTodosRequest(t *testing.T, user string) *http.Request {
+func newGetTasksRequest(t *testing.T, user string) *http.Request {
 	t.Helper()
 
-	return newTodosRequest(t, http.MethodGet, user, nil)
+	return newTasksRequest(t, http.MethodGet, user, nil)
 }
 
-func newCreateTodosRequest(t *testing.T, user string, task string) *http.Request {
+func newCreateTasksRequest(t *testing.T, user string, task string) *http.Request {
 	t.Helper()
 
-	return newTodosRequest(t, http.MethodPost, user, strings.NewReader(task))
+	return newTasksRequest(t, http.MethodPost, user, strings.NewReader(task))
 }
 
-func newTodosRequest(t *testing.T, method string, user string, body io.Reader) *http.Request {
+func newTasksRequest(t *testing.T, method string, user string, body io.Reader) *http.Request {
 	t.Helper()
 
-	path := fmt.Sprintf("/users/%s/todos", user)
+	path := fmt.Sprintf("/users/%s/tasks", user)
 	request, err := http.NewRequest(method, path, body)
 
 	if err != nil {
@@ -238,11 +238,11 @@ func assertContentType(t *testing.T, response *httptest.ResponseRecorder, want s
 	}
 }
 
-func assertAddCalls(t *testing.T, store *StubTodoStore, wantCalls []addTodoCall) {
+func assertAddCalls(t *testing.T, store *StubTaskStore, wantCalls []addTaskCall) {
 	t.Helper()
 
 	if len(store.addCalls) != len(wantCalls) {
-		t.Fatalf("got %d calls to add todo, want %d", len(store.addCalls), len(wantCalls))
+		t.Fatalf("got %d calls to add task, want %d", len(store.addCalls), len(wantCalls))
 	}
 
 	for i := 0; i < len(wantCalls); i++ {
@@ -259,32 +259,32 @@ func assertAddCalls(t *testing.T, store *StubTodoStore, wantCalls []addTodoCall)
 	}
 }
 
-func assertGetTodosCall(t *testing.T, store *StubTodoStore, want getTodosCall) {
+func assertGetTasksCall(t *testing.T, store *StubTaskStore, want getTasksCall) {
 	t.Helper()
 
-	calls := store.getTodosCalls
+	calls := store.getTasksCalls
 
 	if len(calls) != 1 {
-		t.Errorf("got %d call(s) to GetTodos want 1", len(calls))
+		t.Errorf("got %d call(s) to GetTasks want 1", len(calls))
 	}
 
 	got := calls[0]
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got calls to GetTodos %q, want %q", got, want)
+		t.Errorf("got calls to GetTasks %q, want %q", got, want)
 	}
 }
 
-func assertRenderTodosCall(t *testing.T, renderer *SpyRenderer, want []yatta.Task) {
+func assertRenderTasksCall(t *testing.T, renderer *SpyRenderer, want []yatta.Task) {
 	t.Helper()
 
-	if len(renderer.renderTodosCalls) != 1 {
-		t.Fatalf("got %d calls to RenderTodosList, want 1", len(renderer.renderTodosCalls))
+	if len(renderer.renderTasksCalls) != 1 {
+		t.Fatalf("got %d calls to RenderTasksList, want 1", len(renderer.renderTasksCalls))
 	}
 
-	got := renderer.renderTodosCalls[0]
+	got := renderer.renderTasksCalls[0]
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got calls to RenderTodosList %q, want %q", got, want)
+		t.Errorf("got calls to RenderTasksList %q, want %q", got, want)
 	}
 }
