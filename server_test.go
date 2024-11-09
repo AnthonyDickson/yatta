@@ -21,16 +21,16 @@ type addTodoCall struct {
 
 type getTodosCall struct {
 	user  string
-	tasks []string
+	tasks []yatta.Task
 }
 
 type StubTodoStore struct {
-	store         map[string][]string
+	store         map[string][]yatta.Task
 	addCalls      []addTodoCall
 	getTodosCalls []getTodosCall
 }
 
-func (s *StubTodoStore) GetTodos(user string) ([]string, error) {
+func (s *StubTodoStore) GetTodos(user string) ([]yatta.Task, error) {
 	tasks := s.store[user]
 
 	s.getTodosCalls = append(s.getTodosCalls, getTodosCall{user, tasks})
@@ -39,10 +39,10 @@ func (s *StubTodoStore) GetTodos(user string) ([]string, error) {
 }
 
 type SpyRenderer struct {
-	renderTodosCalls [][]string
+	renderTodosCalls [][]yatta.Task
 }
 
-func (s *SpyRenderer) RenderTodosList(todos []string) ([]byte, error) {
+func (s *SpyRenderer) RenderTodosList(todos []yatta.Task) ([]byte, error) {
 	s.renderTodosCalls = append(s.renderTodosCalls, todos)
 
 	return nil, nil
@@ -70,9 +70,9 @@ func TestGetCoffee(t *testing.T) {
 func TestGetTodos(t *testing.T) {
 	getStoreRendererAndServer := func() (*StubTodoStore, *SpyRenderer, *yatta.Server) {
 		store := &StubTodoStore{
-			store: map[string][]string{
-				"Alice": {"send message to Bob"},
-				"thor":  {"write more code"},
+			store: map[string][]yatta.Task{
+				"Alice": {{ID: 0, Description: "send message to Bob"}},
+				"thor":  {{ID: 1, Description: "write more code"}},
 			},
 		}
 
@@ -84,7 +84,7 @@ func TestGetTodos(t *testing.T) {
 
 	t.Run("returns todos for Alice", func(t *testing.T) {
 		store, renderer, server := getStoreRendererAndServer()
-		want := getTodosCall{"Alice", []string{"send message to Bob"}}
+		want := getTodosCall{"Alice", []yatta.Task{{ID: 0, Description: "send message to Bob"}}}
 
 		request := newGetTodosRequest(t, want.user)
 		response := httptest.NewRecorder()
@@ -99,7 +99,7 @@ func TestGetTodos(t *testing.T) {
 
 	t.Run("returns todos for thor", func(t *testing.T) {
 		store, renderer, server := getStoreRendererAndServer()
-		want := getTodosCall{"thor", []string{"write more code"}}
+		want := getTodosCall{"thor", []yatta.Task{{ID: 1, Description: "write more code"}}}
 
 		request := newGetTodosRequest(t, want.user)
 		response := httptest.NewRecorder()
@@ -126,7 +126,7 @@ func TestGetTodos(t *testing.T) {
 func TestCreateTodos(t *testing.T) {
 	t.Run("creates todo on POST", func(t *testing.T) {
 		store := &StubTodoStore{
-			store: map[string][]string{},
+			store: map[string][]yatta.Task{},
 		}
 		server := mustCreateServer(t, store, new(SpyRenderer))
 
@@ -146,7 +146,7 @@ func TestCreateTodos(t *testing.T) {
 
 	t.Run("create multiple todos", func(t *testing.T) {
 		store := &StubTodoStore{
-			store: map[string][]string{},
+			store: map[string][]yatta.Task{},
 		}
 		server := mustCreateServer(t, store, new(SpyRenderer))
 
@@ -275,7 +275,7 @@ func assertGetTodosCall(t *testing.T, store *StubTodoStore, want getTodosCall) {
 	}
 }
 
-func assertRenderTodosCall(t *testing.T, renderer *SpyRenderer, want []string) {
+func assertRenderTodosCall(t *testing.T, renderer *SpyRenderer, want []yatta.Task) {
 	t.Helper()
 
 	if len(renderer.renderTodosCalls) != 1 {

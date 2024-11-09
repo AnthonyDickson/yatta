@@ -16,10 +16,10 @@ func TestCreateAndGetTodo(t *testing.T) {
 	renderer := mustCreateRenderer(t)
 	server := mustCreateServer(t, store, renderer)
 	user := "Pierre"
-	tasks := []string{"write a book", "philosophise"}
+	tasks := []yatta.Task{{ID: 0, Description: "write a book"}, {ID: 0, Description: "philosophise"}}
 
 	for _, task := range tasks {
-		server.ServeHTTP(httptest.NewRecorder(), newCreateTodosRequest(t, user, task))
+		server.ServeHTTP(httptest.NewRecorder(), newCreateTodosRequest(t, user, task.Description))
 	}
 
 	response := httptest.NewRecorder()

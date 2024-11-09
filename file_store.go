@@ -16,7 +16,7 @@ func NewFileTodoStore(database *os.File) *FileTodoStore {
 	return &FileTodoStore{database: database}
 }
 
-func (f *FileTodoStore) GetTodos(user string) ([]string, error) {
+func (f *FileTodoStore) GetTodos(user string) ([]Task, error) {
 	todoLists, err := f.getTodoLists()
 
 	if err != nil {
@@ -32,7 +32,7 @@ func (f *FileTodoStore) GetTodos(user string) ([]string, error) {
 	return nil, nil
 }
 
-func (f *FileTodoStore) AddTodo(user string, todo string) error {
+func (f *FileTodoStore) AddTodo(user string, description string) error {
 	todoLists, err := f.getTodoLists()
 
 	if err != nil {
@@ -40,11 +40,12 @@ func (f *FileTodoStore) AddTodo(user string, todo string) error {
 	}
 
 	userTodoList := todoLists.find(user)
+	todo := Task{ID: 0, Description: description}
 
 	if userTodoList != nil {
 		userTodoList.Tasks = append(userTodoList.Tasks, todo)
 	} else {
-		*todoLists = append(*todoLists, todoList{user, []string{todo}})
+		*todoLists = append(*todoLists, todoList{user, []Task{todo}})
 	}
 
 	return f.updateDatabase(todoLists)
@@ -83,7 +84,7 @@ func (f *FileTodoStore) updateDatabase(todoLists *todoLists) error {
 // A list of todos for a user.
 type todoList struct {
 	User  string
-	Tasks []string
+	Tasks []Task
 }
 
 type todoLists []todoList

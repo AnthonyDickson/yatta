@@ -13,10 +13,10 @@ func TestRenderer_TodosList(t *testing.T) {
 	renderer := mustCreateRenderer(t)
 
 	t.Run("renders todos list", func(t *testing.T) {
-		want := []string{
-			"eat",
-			"sleep",
-			"debug tests 🙃",
+		want := []yatta.Task{
+			{ID: 0, Description: "eat"},
+			{ID: 1, Description: "sleep"},
+			{ID: 2, Description: "debug tests 🙃"},
 		}
 
 		htmlString, err := renderer.RenderTodosList(want)
@@ -46,7 +46,7 @@ func assertNoError(t *testing.T, err error) {
 	}
 }
 
-func assertHTMLContainsTodos(t *testing.T, htmlString string, want []string) {
+func assertHTMLContainsTodos(t *testing.T, htmlString string, tasks []yatta.Task) {
 	t.Helper()
 
 	doc, err := html.Parse(strings.NewReader(htmlString))
@@ -56,6 +56,12 @@ func assertHTMLContainsTodos(t *testing.T, htmlString string, want []string) {
 	}
 
 	got := extractTodosFromHTML(t, doc)
+
+	var want []string
+
+	for _, task := range tasks {
+		want = append(want, task.Description)
+	}
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got todo list %q want %q", got, want)

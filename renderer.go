@@ -13,7 +13,7 @@ var (
 )
 
 type Renderer interface {
-	RenderTodosList(todos []string) ([]byte, error)
+	RenderTodosList(todos []Task) ([]byte, error)
 }
 
 type HTMLRenderer struct {
@@ -35,7 +35,7 @@ func NewHTMLRenderer() (*HTMLRenderer, error) {
 	return renderer, nil
 }
 
-func (r *HTMLRenderer) RenderTodosList(todos []string) ([]byte, error) {
+func (r *HTMLRenderer) RenderTodosList(todos []Task) ([]byte, error) {
 	body := new(bytes.Buffer)
 	templatePath := "todo_list.html"
 

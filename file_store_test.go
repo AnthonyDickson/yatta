@@ -14,16 +14,16 @@ func TestFileTodoStore(t *testing.T) {
         {
           "user": "Alice", 
           "tasks": [
-            "send message to Bob",
-            "upgrade encryption",
-            "read message from Bob"
+            {"ID": 0, "Description": "send message to Bob"},
+            {"ID": 1, "Description": "upgrade encryption"},
+            {"ID": 2, "Description": "read message from Bob"}
           ]
         },
         {
           "user": "Bob",
           "tasks": [
-            "read message from Alice",
-            "send message to Bob"
+            {"ID": 3, "Description": "read message from Alice"},
+            {"ID": 4, "Description": "send message to Alice"}
           ]
         }
       ]`)
@@ -31,14 +31,14 @@ func TestFileTodoStore(t *testing.T) {
 
 		store := yatta.NewFileTodoStore(database)
 
-		assertTodos(t, store, "Alice", []string{
-			"send message to Bob",
-			"upgrade encryption",
-			"read message from Bob",
+		assertTodos(t, store, "Alice", []yatta.Task{
+			{ID: 0, Description: "send message to Bob"},
+			{ID: 1, Description: "upgrade encryption"},
+			{ID: 2, Description: "read message from Bob"},
 		})
-		assertTodos(t, store, "Bob", []string{
-			"read message from Alice",
-			"send message to Bob",
+		assertTodos(t, store, "Bob", []yatta.Task{
+			{ID: 3, Description: "read message from Alice"},
+			{ID: 4, Description: "send message to Alice"},
 		})
 	})
 
@@ -55,7 +55,7 @@ func TestFileTodoStore(t *testing.T) {
 		err := store.AddTodo("Alice", "find the keys")
 
 		assertNoError(t, err)
-		assertTodos(t, store, "Alice", []string{"find the keys"})
+		assertTodos(t, store, "Alice", []yatta.Task{{ID: 0, Description: "find the keys"}})
 	})
 
 	t.Run("add todo for new user", func(t *testing.T) {
@@ -66,11 +66,11 @@ func TestFileTodoStore(t *testing.T) {
 		err := store.AddTodo("Alice", "find the keys")
 
 		assertNoError(t, err)
-		assertTodos(t, store, "Alice", []string{"find the keys"})
+		assertTodos(t, store, "Alice", []yatta.Task{{ID: 0, Description: "find the keys"}})
 	})
 }
 
-func assertTodos(t *testing.T, store *yatta.FileTodoStore, user string, want []string) {
+func assertTodos(t *testing.T, store *yatta.FileTodoStore, user string, want []yatta.Task) {
 	t.Helper()
 
 	got, err := store.GetTodos(user)
