@@ -96,8 +96,8 @@ func assertGetTask(t *testing.T, store *yatta.FileTaskStore, id uint64, want yat
 	got, err := store.GetTask(id)
 	assertNoError(t, err)
 
-	if got != want {
-		t.Errorf("got task %v want %v", got, want)
+	if *got != want {
+		t.Errorf("got task %v want %v", *got, want)
 	}
 }
 

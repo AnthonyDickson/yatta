@@ -32,22 +32,22 @@ func (f *FileTaskStore) GetTasks(user string) ([]Task, error) {
 	return nil, nil
 }
 
-func (f *FileTaskStore) GetTask(id uint64) (Task, error) {
+func (f *FileTaskStore) GetTask(id uint64) (*Task, error) {
 	taskLists, err := f.getTaskLists()
 
 	if err != nil {
-		return Task{ID: 0, Description: ""}, fmt.Errorf("could not get tasks: %v", err)
+		return nil, fmt.Errorf("could not get tasks: %v", err)
 	}
 
 	for _, taskList := range *taskLists {
 		for _, task := range taskList.Tasks {
 			if task.ID == id {
-				return task, nil
+				return &task, nil
 			}
 		}
 	}
 
-	return Task{ID: 0, Description: ""}, nil
+	return nil, nil
 }
 
 func (f *FileTaskStore) AddTask(user string, description string) error {

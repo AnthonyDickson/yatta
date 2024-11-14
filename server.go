@@ -55,7 +55,12 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := s.renderer.RenderTask(task)
+	if task == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	body, err := s.renderer.RenderTask(*task)
 	writeResponse(w, body, err, r.URL)
 }
 

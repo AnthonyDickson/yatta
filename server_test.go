@@ -26,7 +26,7 @@ type getTasksCall struct {
 
 type getTaskCall struct {
 	id   uint64
-	task yatta.Task
+	task *yatta.Task
 }
 
 type StubTaskStore struct {
@@ -44,19 +44,18 @@ func (s *StubTaskStore) GetTasks(user string) ([]yatta.Task, error) {
 	return tasks, nil
 }
 
-func (s *StubTaskStore) GetTask(id uint64) (yatta.Task, error) {
+func (s *StubTaskStore) GetTask(id uint64) (*yatta.Task, error) {
 	for _, tasks := range s.store {
 		for _, task := range tasks {
 			if task.ID == id {
-				s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: task})
-				return task, nil
+				s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: &task})
+				return &task, nil
 			}
 		}
 	}
 
-	task := yatta.Task{ID: 0, Description: ""}
-	s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: task})
-	return task, nil
+	s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: nil})
+	return nil, nil
 }
 
 type SpyRenderer struct {
@@ -174,6 +173,23 @@ func TestGetTask(t *testing.T) {
 		assertContentType(t, response, htmlContentType)
 		assertGetTaskCall(t, store, want[0])
 		assertRenderTaskCall(t, renderer, want[0])
+	})
+
+	t.Run("get task by invalid ID returns 404 not found", func(t *testing.T) {
+		store := &StubTaskStore{
+			store: map[string][]yatta.Task{
+				"Alice": {{ID: 0, Description: "find my todos list"}},
+			},
+		}
+
+		renderer := new(SpyRenderer)
+		server := mustCreateServer(t, store, renderer)
+
+		request, _ := http.NewRequest(http.MethodGet, "/tasks/8", nil)
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusNotFound)
 	})
 }
 
@@ -350,10 +366,12 @@ func assertGetTaskCall(t *testing.T, store *StubTaskStore, want yatta.Task) {
 		t.Fatalf("got %d calls to GetTask, want 1", len(store.getTaskCalls))
 	}
 
-	got := store.getTaskCalls[0]
+	got := store.getTaskCalls[0].task
 
-	if got.task != want {
-		t.Errorf("got task %v want %v", got, want)
+	if got == nil {
+		t.Errorf("got nil task, want %v", want)
+	} else if *got != want {
+		t.Errorf("got task %v want %v", *got, want)
 	}
 }
 
