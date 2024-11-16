@@ -1,0 +1,28 @@
+{{ define "base" }}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ template "title" . }} | Yatta</title>
+</head>
+
+<body>
+  <header>
+    <h1><a href="/">Yatta</a></h1>
+    <nav>
+    </nav>
+  </header>
+
+  <main>
+    {{ template "body" . }}
+  </main>
+
+  <footer>
+
+  </footer>
+</body>
+
+</html>
+{{ end }}

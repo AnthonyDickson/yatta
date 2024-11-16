@@ -1,5 +1,10 @@
+{{ template "base" . }}
+{{ define "title" }}Tasks{{ end }}
+
+{{ define "body" }}
 <ul>
   {{range .}}
   <li>{{.Description}}</li>
   {{end}}
 </ul>
+{{ end }}

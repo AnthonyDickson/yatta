@@ -1,6 +1,8 @@
 package main_test
 
 import (
+	"fmt"
+	"log/slog"
 	"reflect"
 	"strings"
 	"testing"
@@ -79,6 +81,7 @@ func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []yatta.Task
 	}
 
 	if !reflect.DeepEqual(got, want) {
+		slog.Error(fmt.Sprintf("Got HTML: %s", htmlString))
 		t.Errorf("got task list %q want %q", got, want)
 	}
 }

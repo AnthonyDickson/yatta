@@ -1,1 +1,6 @@
+{{ template "base" . }}
+{{ define "title" }}Task #{{ .ID }}{{ end }}
+
+{{ define "body" }}
 <p>{{.Description}}</p>
+{{ end }}
