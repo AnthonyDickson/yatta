@@ -13,5 +13,5 @@ go test
 
 ## Name
 
-YATTA comes from the Japanese phrase やった！(yatta), which means "hooray" or "yay".
+YATTA comes from the Japanese phrase やった！(yatta), which means "hooray" or literally "I/We/You did it!".
 You know, the kind of thing you say when you check off an item on your todo list.
