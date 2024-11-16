@@ -43,7 +43,7 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseUint(id_string, 10, 64)
 
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		http.NotFound(w, r)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if task == nil {
-		w.WriteHeader(http.StatusNotFound)
+		http.NotFound(w, r)
 		return
 	}
 
@@ -75,7 +75,7 @@ func (s *Server) getTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if tasks == nil {
-		w.WriteHeader(http.StatusNotFound)
+		http.NotFound(w, r)
 		return
 	}
 
