@@ -12,20 +12,23 @@ import (
 const htmlContentType = "text/html"
 
 type Server struct {
-	store    TaskStore
-	renderer Renderer
+	userStore UserStore
+	taskStore TaskStore
+	renderer  Renderer
 	http.Handler
 }
 
-func NewServer(store TaskStore, renderer Renderer) (*Server, error) {
+func NewServer(taskStore TaskStore, userStore UserStore, renderer Renderer) (*Server, error) {
 	server := new(Server)
-	server.store = store
+	server.taskStore = taskStore
+	server.userStore = userStore
 
 	router := http.NewServeMux()
 	router.Handle("GET /coffee", http.HandlerFunc(server.getCoffee))
 	router.Handle("GET /tasks/{id}", http.HandlerFunc(server.getTask))
 	router.Handle("GET /users/{user}/tasks", http.HandlerFunc(server.getTasks))
 	router.Handle("POST /users/{user}/tasks", http.HandlerFunc(server.addTask))
+	router.Handle("POST /users", http.HandlerFunc(server.createUser))
 
 	server.Handler = router
 
@@ -47,7 +50,7 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := s.store.GetTask(id)
+	task, err := s.taskStore.GetTask(id)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -66,7 +69,7 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getTasks(w http.ResponseWriter, r *http.Request) {
 	user := r.PathValue("user")
-	tasks, err := s.store.GetTasks(user)
+	tasks, err := s.taskStore.GetTasks(user)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -109,11 +112,46 @@ func (s *Server) addTask(w http.ResponseWriter, r *http.Request) {
 
 	task := string(bodyBytes)
 
-	err = s.store.AddTask(user, task)
+	err = s.taskStore.AddTask(user, task)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		slog.Error(fmt.Sprintf("could not add task %q for user %q: %v", user, task, err))
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
+const formContentType = "application/x-www-form-urlencoded"
+
+func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != formContentType {
+		w.WriteHeader(http.StatusUnsupportedMediaType)
+		return
+	}
+
+	err := r.ParseForm()
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error(fmt.Sprintf("could not parse form: %v", err))
+		return
+	}
+
+	if !r.Form.Has("email") || !r.Form.Has("password") {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	email := r.Form.Get("email")
+	password := r.Form.Get("password")
+
+	err = s.userStore.CreateUser(email, password)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error(fmt.Sprintf("could not create user: %v", err))
 		return
 	}
 

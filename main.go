@@ -6,6 +6,13 @@ import (
 	"os"
 )
 
+// TODO: Replace dummy user store with real one
+type DummyUserStore struct{}
+
+func (d *DummyUserStore) CreateUser(email, password string) error {
+	return nil
+}
+
 const dbFileName = "todos.db.json"
 
 func main() {
@@ -22,7 +29,7 @@ func main() {
 		log.Fatalf("an error occurred while creating the HTML renderer: %v", err)
 	}
 
-	server, err := NewServer(store, renderer)
+	server, err := NewServer(store, new(DummyUserStore), renderer)
 
 	if err != nil {
 		log.Fatalf("an error occurred while creating the server: %v", err)

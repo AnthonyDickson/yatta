@@ -14,7 +14,8 @@ func TestCreateAndGetTasks(t *testing.T) {
 
 	store := yatta.NewFileTaskStore(database)
 	renderer := mustCreateRenderer(t)
-	server := mustCreateServer(t, store, renderer)
+	// TODO: Replace dummy user store with real one
+	server := mustCreateServer(t, store, new(DummyUserStore), renderer)
 	user := "Pierre"
 	tasks := []yatta.Task{{ID: 0, Description: "write a book"}, {ID: 0, Description: "philosophise"}}
 

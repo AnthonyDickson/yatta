@@ -81,9 +81,15 @@ func (s *StubTaskStore) AddTask(user string, task string) error {
 	return nil
 }
 
+type DummyUserStore struct{}
+
+func (d *DummyUserStore) CreateUser(email, password string) error {
+	return nil
+}
+
 func TestGetCoffee(t *testing.T) {
 	t.Run("returns status 418", func(t *testing.T) {
-		server := mustCreateServer(t, new(StubTaskStore), new(SpyRenderer))
+		server := mustCreateServer(t, new(StubTaskStore), new(DummyUserStore), new(SpyRenderer))
 
 		response := httptest.NewRecorder()
 		request := newGetCoffeeRequest(t)
@@ -105,7 +111,7 @@ func TestGetTasks(t *testing.T) {
 
 		renderer := new(SpyRenderer)
 
-		server := mustCreateServer(t, store, renderer)
+		server := mustCreateServer(t, store, new(DummyUserStore), renderer)
 		return store, renderer, server
 	}
 
@@ -163,7 +169,7 @@ func TestGetTask(t *testing.T) {
 			},
 		}
 		renderer := new(SpyRenderer)
-		server := mustCreateServer(t, store, renderer)
+		server := mustCreateServer(t, store, new(DummyUserStore), renderer)
 
 		request, _ := http.NewRequest(http.MethodGet, "/tasks/0", nil)
 		response := httptest.NewRecorder()
@@ -183,7 +189,7 @@ func TestGetTask(t *testing.T) {
 		}
 
 		renderer := new(SpyRenderer)
-		server := mustCreateServer(t, store, renderer)
+		server := mustCreateServer(t, store, new(DummyUserStore), renderer)
 
 		request, _ := http.NewRequest(http.MethodGet, "/tasks/8", nil)
 		response := httptest.NewRecorder()
@@ -198,7 +204,7 @@ func TestCreateTasks(t *testing.T) {
 		store := &StubTaskStore{
 			store: map[string][]yatta.Task{},
 		}
-		server := mustCreateServer(t, store, new(SpyRenderer))
+		server := mustCreateServer(t, store, new(DummyUserStore), new(SpyRenderer))
 
 		want := addTaskCall{
 			user: "Alice",
@@ -218,7 +224,7 @@ func TestCreateTasks(t *testing.T) {
 		store := &StubTaskStore{
 			store: map[string][]yatta.Task{},
 		}
-		server := mustCreateServer(t, store, new(SpyRenderer))
+		server := mustCreateServer(t, store, new(DummyUserStore), new(SpyRenderer))
 
 		cases := []addTaskCall{
 			{"Thor", "write code"},
@@ -239,10 +245,127 @@ func TestCreateTasks(t *testing.T) {
 	})
 }
 
-func mustCreateServer(t *testing.T, store yatta.TaskStore, renderer yatta.Renderer) *yatta.Server {
+const formContentType = "application/x-www-form-urlencoded"
+
+type DummyTaskStore struct{}
+
+func (d *DummyTaskStore) GetTask(id uint64) (*yatta.Task, error) {
+	return nil, nil
+}
+
+func (d *DummyTaskStore) GetTasks(user string) ([]yatta.Task, error) {
+	return nil, nil
+}
+
+func (d *DummyTaskStore) AddTask(user string, description string) error {
+	return nil
+}
+
+type DummyRenderer struct{}
+
+func (d *DummyRenderer) RenderTask(task yatta.Task) ([]byte, error) {
+	return nil, nil
+}
+
+func (d *DummyRenderer) RenderTaskList(tasks []yatta.Task) ([]byte, error) {
+	return nil, nil
+}
+
+type createUserCall struct {
+	Email    string
+	Password string
+}
+
+type SpyUserStore struct {
+	createUserCalls []createUserCall
+}
+
+func (s *SpyUserStore) CreateUser(email, password string) error {
+	s.createUserCalls = append(s.createUserCalls, createUserCall{email, password})
+	return nil
+}
+
+func TestCreateUser(t *testing.T) {
+	t.Run("can create a new user", func(t *testing.T) {
+		cases := []createUserCall{
+			{"test@test.com", "hunter2"},
+			{"foo@bar.com", "baz"},
+		}
+
+		for _, want := range cases {
+			store := new(SpyUserStore)
+
+			server := mustCreateServer(t, new(DummyTaskStore), store, new(DummyRenderer))
+			request := newCreateUserRequest(t, want)
+			response := httptest.NewRecorder()
+
+			server.ServeHTTP(response, request)
+
+			assertStatus(t, response, http.StatusAccepted)
+			assertCreateUserCalls(t, store, want)
+		}
+	})
+
+	server := mustCreateServer(t, new(DummyTaskStore), new(DummyUserStore), new(DummyRenderer))
+
+	t.Run("wrong content type returns HTTP status unsupported media type", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodPost, "/users", nil)
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusUnsupportedMediaType)
+	})
+
+	t.Run("invalid form returns HTTP status bad request", func(t *testing.T) {
+		cases := []io.Reader{
+			nil,
+			strings.NewReader(""),
+			strings.NewReader("email="),
+			strings.NewReader("password="),
+		}
+
+		for _, requestBody := range cases {
+			request := httptest.NewRequest(http.MethodPost, "/users", requestBody)
+			request.Header.Add("Content-Type", formContentType)
+			response := httptest.NewRecorder()
+
+			server.ServeHTTP(response, request)
+
+			assertStatus(t, response, http.StatusBadRequest)
+		}
+	})
+
+	// TODO: validate emails for formatting and uniqueness, and passwords for strength.
+}
+
+func newCreateUserRequest(t *testing.T, user createUserCall) *http.Request {
 	t.Helper()
 
-	server, err := yatta.NewServer(store, renderer)
+	request := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(fmt.Sprintf("email=%s&password=%s", user.Email, user.Password)))
+	request.Header.Add("Content-Type", formContentType)
+
+	return request
+}
+
+func assertCreateUserCalls(t *testing.T, store *SpyUserStore, want createUserCall) {
+	t.Helper()
+
+	if len(store.createUserCalls) != 1 {
+		t.Fatalf("got %d calls to CreateUser, want 1", len(store.createUserCalls))
+	}
+
+	got := store.createUserCalls[0]
+
+	if got != want {
+		t.Errorf("got call to CreateUser with arguments %v, want %v", got, want)
+	}
+}
+
+func mustCreateServer(t *testing.T, taskStore yatta.TaskStore, userStore yatta.UserStore, renderer yatta.Renderer) *yatta.Server {
+	t.Helper()
+
+	server, err := yatta.NewServer(taskStore, userStore, renderer)
 
 	if err != nil {
 		t.Errorf("an ocurred while creating the server: %v", err)
