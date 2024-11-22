@@ -1,10 +1,12 @@
-package main
+package stores
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/AnthonyDickson/yatta/models"
 )
 
 // Persists tasks to disk.
@@ -16,7 +18,7 @@ func NewFileTaskStore(database *os.File) *FileTaskStore {
 	return &FileTaskStore{database: database}
 }
 
-func (f *FileTaskStore) GetTasks(user string) ([]Task, error) {
+func (f *FileTaskStore) GetTasks(user string) ([]models.Task, error) {
 	taskLists, err := f.getTaskLists()
 
 	if err != nil {
@@ -32,7 +34,7 @@ func (f *FileTaskStore) GetTasks(user string) ([]Task, error) {
 	return nil, nil
 }
 
-func (f *FileTaskStore) GetTask(id uint64) (*Task, error) {
+func (f *FileTaskStore) GetTask(id uint64) (*models.Task, error) {
 	taskLists, err := f.getTaskLists()
 
 	if err != nil {
@@ -58,12 +60,12 @@ func (f *FileTaskStore) AddTask(user string, description string) error {
 	}
 
 	userTaskList := taskLists.find(user)
-	task := Task{ID: 0, Description: description}
+	task := models.Task{ID: 0, Description: description}
 
 	if userTaskList != nil {
 		userTaskList.Tasks = append(userTaskList.Tasks, task)
 	} else {
-		*taskLists = append(*taskLists, taskList{user, []Task{task}})
+		*taskLists = append(*taskLists, taskList{user, []models.Task{task}})
 	}
 
 	return f.updateDatabase(taskLists)
@@ -102,7 +104,7 @@ func (f *FileTaskStore) updateDatabase(taskLists *taskLists) error {
 // A list of tasks for a user.
 type taskList struct {
 	User  string
-	Tasks []Task
+	Tasks []models.Task
 }
 
 type taskLists []taskList

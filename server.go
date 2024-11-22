@@ -7,18 +7,20 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/AnthonyDickson/yatta/stores"
 )
 
 const htmlContentType = "text/html"
 
 type Server struct {
-	userStore UserStore
-	taskStore TaskStore
+	userStore stores.UserStore
+	taskStore stores.TaskStore
 	renderer  Renderer
 	http.Handler
 }
 
-func NewServer(taskStore TaskStore, userStore UserStore, renderer Renderer) (*Server, error) {
+func NewServer(taskStore stores.TaskStore, userStore stores.UserStore, renderer Renderer) (*Server, error) {
 	server := new(Server)
 	server.taskStore = taskStore
 	server.userStore = userStore

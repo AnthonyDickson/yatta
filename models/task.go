@@ -1,4 +1,4 @@
-package main
+package models
 
 type Task struct {
 	ID          uint64

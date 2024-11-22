@@ -4,6 +4,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/AnthonyDickson/yatta/stores"
 )
 
 // TODO: Replace dummy user store with real one
@@ -22,7 +24,7 @@ func main() {
 		log.Fatalf("could not open file %s: %v", dbFileName, err)
 	}
 
-	store := NewFileTaskStore(database)
+	store := stores.NewFileTaskStore(database)
 	renderer, err := NewHTMLRenderer()
 
 	if err != nil {

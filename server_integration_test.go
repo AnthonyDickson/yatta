@@ -5,19 +5,22 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	yatta "github.com/AnthonyDickson/yatta"
+	"github.com/AnthonyDickson/yatta/models"
+	"github.com/AnthonyDickson/yatta/stores"
+	"github.com/AnthonyDickson/yatta/yattatest"
 )
 
 func TestCreateAndGetTasks(t *testing.T) {
-	database, cleanup := createTempFile(t, "")
+	database, cleanup := yattatest.CreateTempFile(t, "")
 	defer cleanup()
 
-	store := yatta.NewFileTaskStore(database)
+	taskStore := stores.NewFileTaskStore(database)
+	// userStore := yatta.NewFileUserStore(database)
 	renderer := mustCreateRenderer(t)
 	// TODO: Replace dummy user store with real one
-	server := mustCreateServer(t, store, new(DummyUserStore), renderer)
+	server := mustCreateServer(t, taskStore, new(DummyUserStore), renderer)
 	user := "Pierre"
-	tasks := []yatta.Task{{ID: 0, Description: "write a book"}, {ID: 0, Description: "philosophise"}}
+	tasks := []models.Task{{ID: 0, Description: "write a book"}, {ID: 0, Description: "philosophise"}}
 
 	for _, task := range tasks {
 		server.ServeHTTP(httptest.NewRecorder(), newCreateTasksRequest(t, user, task.Description))

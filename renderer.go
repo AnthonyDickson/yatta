@@ -5,6 +5,8 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+
+	"github.com/AnthonyDickson/yatta/models"
 )
 
 var (
@@ -22,10 +24,10 @@ const (
 // Renderer converts tasks into a string representation.
 type Renderer interface {
 	// Render a single task.
-	RenderTask(task Task) ([]byte, error)
+	RenderTask(task models.Task) ([]byte, error)
 
 	// Render tasks as list.
-	RenderTaskList(tasks []Task) ([]byte, error)
+	RenderTaskList(tasks []models.Task) ([]byte, error)
 }
 
 // Renders responses as HTML pages.
@@ -59,14 +61,14 @@ func NewHTMLRenderer() (*HTMLRenderer, error) {
 // Render the HTML page for a single task.
 //
 // Returns an error if the template could not be found or rendered.
-func (r *HTMLRenderer) RenderTask(task Task) ([]byte, error) {
+func (r *HTMLRenderer) RenderTask(task models.Task) ([]byte, error) {
 	return r.renderHTMLTemplate(taskTemplatePath, task)
 }
 
 // Render the HTML page for a list of tasks.
 //
 // Returns an error if the template could not be found or rendered.
-func (r *HTMLRenderer) RenderTaskList(tasks []Task) ([]byte, error) {
+func (r *HTMLRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
 	return r.renderHTMLTemplate(taskListTemplatePath, tasks)
 }
 

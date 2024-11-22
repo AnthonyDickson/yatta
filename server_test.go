@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	yatta "github.com/AnthonyDickson/yatta"
+	"github.com/AnthonyDickson/yatta/models"
+	"github.com/AnthonyDickson/yatta/stores"
 )
 
 const htmlContentType = "text/html"
@@ -21,22 +23,22 @@ type addTaskCall struct {
 
 type getTasksCall struct {
 	user  string
-	tasks []yatta.Task
+	tasks []models.Task
 }
 
 type getTaskCall struct {
 	id   uint64
-	task *yatta.Task
+	task *models.Task
 }
 
 type StubTaskStore struct {
-	store         map[string][]yatta.Task
+	store         map[string][]models.Task
 	addCalls      []addTaskCall
 	getTasksCalls []getTasksCall
 	getTaskCalls  []getTaskCall
 }
 
-func (s *StubTaskStore) GetTasks(user string) ([]yatta.Task, error) {
+func (s *StubTaskStore) GetTasks(user string) ([]models.Task, error) {
 	tasks := s.store[user]
 
 	s.getTasksCalls = append(s.getTasksCalls, getTasksCall{user, tasks})
@@ -44,7 +46,7 @@ func (s *StubTaskStore) GetTasks(user string) ([]yatta.Task, error) {
 	return tasks, nil
 }
 
-func (s *StubTaskStore) GetTask(id uint64) (*yatta.Task, error) {
+func (s *StubTaskStore) GetTask(id uint64) (*models.Task, error) {
 	for _, tasks := range s.store {
 		for _, task := range tasks {
 			if task.ID == id {
@@ -59,17 +61,17 @@ func (s *StubTaskStore) GetTask(id uint64) (*yatta.Task, error) {
 }
 
 type SpyRenderer struct {
-	renderTasksCalls [][]yatta.Task
-	renderTaskCalls  []yatta.Task
+	renderTasksCalls [][]models.Task
+	renderTaskCalls  []models.Task
 }
 
-func (s *SpyRenderer) RenderTaskList(tasks []yatta.Task) ([]byte, error) {
+func (s *SpyRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
 	s.renderTasksCalls = append(s.renderTasksCalls, tasks)
 
 	return nil, nil
 }
 
-func (s *SpyRenderer) RenderTask(task yatta.Task) ([]byte, error) {
+func (s *SpyRenderer) RenderTask(task models.Task) ([]byte, error) {
 	s.renderTaskCalls = append(s.renderTaskCalls, task)
 
 	return nil, nil
@@ -103,7 +105,7 @@ func TestGetCoffee(t *testing.T) {
 func TestGetTasks(t *testing.T) {
 	getStoreRendererAndServer := func() (*StubTaskStore, *SpyRenderer, *yatta.Server) {
 		store := &StubTaskStore{
-			store: map[string][]yatta.Task{
+			store: map[string][]models.Task{
 				"Alice": {{ID: 0, Description: "send message to Bob"}},
 				"thor":  {{ID: 1, Description: "write more code"}},
 			},
@@ -117,7 +119,7 @@ func TestGetTasks(t *testing.T) {
 
 	t.Run("returns tasks for Alice", func(t *testing.T) {
 		store, renderer, server := getStoreRendererAndServer()
-		want := getTasksCall{"Alice", []yatta.Task{{ID: 0, Description: "send message to Bob"}}}
+		want := getTasksCall{"Alice", []models.Task{{ID: 0, Description: "send message to Bob"}}}
 
 		request := newGetTasksRequest(t, want.user)
 		response := httptest.NewRecorder()
@@ -132,7 +134,7 @@ func TestGetTasks(t *testing.T) {
 
 	t.Run("returns tasks for thor", func(t *testing.T) {
 		store, renderer, server := getStoreRendererAndServer()
-		want := getTasksCall{"thor", []yatta.Task{{ID: 1, Description: "write more code"}}}
+		want := getTasksCall{"thor", []models.Task{{ID: 1, Description: "write more code"}}}
 
 		request := newGetTasksRequest(t, want.user)
 		response := httptest.NewRecorder()
@@ -158,13 +160,13 @@ func TestGetTasks(t *testing.T) {
 
 func TestGetTask(t *testing.T) {
 	t.Run("get task by id", func(t *testing.T) {
-		want := []yatta.Task{
+		want := []models.Task{
 			{ID: 0, Description: "write more tasks"},
 			{ID: 1, Description: "stop writing too many tasks"},
 		}
 
 		store := &StubTaskStore{
-			store: map[string][]yatta.Task{
+			store: map[string][]models.Task{
 				"Alice": want,
 			},
 		}
@@ -183,7 +185,7 @@ func TestGetTask(t *testing.T) {
 
 	t.Run("get task by invalid ID returns 404 not found", func(t *testing.T) {
 		store := &StubTaskStore{
-			store: map[string][]yatta.Task{
+			store: map[string][]models.Task{
 				"Alice": {{ID: 0, Description: "find my todos list"}},
 			},
 		}
@@ -202,7 +204,7 @@ func TestGetTask(t *testing.T) {
 func TestCreateTasks(t *testing.T) {
 	t.Run("creates task on POST", func(t *testing.T) {
 		store := &StubTaskStore{
-			store: map[string][]yatta.Task{},
+			store: map[string][]models.Task{},
 		}
 		server := mustCreateServer(t, store, new(DummyUserStore), new(SpyRenderer))
 
@@ -222,7 +224,7 @@ func TestCreateTasks(t *testing.T) {
 
 	t.Run("create multiple tasks", func(t *testing.T) {
 		store := &StubTaskStore{
-			store: map[string][]yatta.Task{},
+			store: map[string][]models.Task{},
 		}
 		server := mustCreateServer(t, store, new(DummyUserStore), new(SpyRenderer))
 
@@ -249,11 +251,11 @@ const formContentType = "application/x-www-form-urlencoded"
 
 type DummyTaskStore struct{}
 
-func (d *DummyTaskStore) GetTask(id uint64) (*yatta.Task, error) {
+func (d *DummyTaskStore) GetTask(id uint64) (*models.Task, error) {
 	return nil, nil
 }
 
-func (d *DummyTaskStore) GetTasks(user string) ([]yatta.Task, error) {
+func (d *DummyTaskStore) GetTasks(user string) ([]models.Task, error) {
 	return nil, nil
 }
 
@@ -263,11 +265,11 @@ func (d *DummyTaskStore) AddTask(user string, description string) error {
 
 type DummyRenderer struct{}
 
-func (d *DummyRenderer) RenderTask(task yatta.Task) ([]byte, error) {
+func (d *DummyRenderer) RenderTask(task models.Task) ([]byte, error) {
 	return nil, nil
 }
 
-func (d *DummyRenderer) RenderTaskList(tasks []yatta.Task) ([]byte, error) {
+func (d *DummyRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
 	return nil, nil
 }
 
@@ -362,7 +364,7 @@ func assertCreateUserCalls(t *testing.T, store *SpyUserStore, want createUserCal
 	}
 }
 
-func mustCreateServer(t *testing.T, taskStore yatta.TaskStore, userStore yatta.UserStore, renderer yatta.Renderer) *yatta.Server {
+func mustCreateServer(t *testing.T, taskStore stores.TaskStore, userStore stores.UserStore, renderer yatta.Renderer) *yatta.Server {
 	t.Helper()
 
 	server, err := yatta.NewServer(taskStore, userStore, renderer)
@@ -468,7 +470,7 @@ func assertGetTasksCall(t *testing.T, store *StubTaskStore, want getTasksCall) {
 	}
 }
 
-func assertRenderTasksCall(t *testing.T, renderer *SpyRenderer, want []yatta.Task) {
+func assertRenderTasksCall(t *testing.T, renderer *SpyRenderer, want []models.Task) {
 	t.Helper()
 
 	if len(renderer.renderTasksCalls) != 1 {
@@ -482,7 +484,7 @@ func assertRenderTasksCall(t *testing.T, renderer *SpyRenderer, want []yatta.Tas
 	}
 }
 
-func assertGetTaskCall(t *testing.T, store *StubTaskStore, want yatta.Task) {
+func assertGetTaskCall(t *testing.T, store *StubTaskStore, want models.Task) {
 	t.Helper()
 
 	if len(store.getTaskCalls) != 1 {
@@ -498,7 +500,7 @@ func assertGetTaskCall(t *testing.T, store *StubTaskStore, want yatta.Task) {
 	}
 }
 
-func assertRenderTaskCall(t *testing.T, renderer *SpyRenderer, want yatta.Task) {
+func assertRenderTaskCall(t *testing.T, renderer *SpyRenderer, want models.Task) {
 	t.Helper()
 
 	if len(renderer.renderTaskCalls) != 1 {

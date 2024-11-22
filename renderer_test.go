@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	yatta "github.com/AnthonyDickson/yatta"
+	"github.com/AnthonyDickson/yatta/models"
+	"github.com/AnthonyDickson/yatta/yattatest"
 	"golang.org/x/net/html"
 )
 
@@ -15,7 +17,7 @@ func TestRenderer_TasksList(t *testing.T) {
 	renderer := mustCreateRenderer(t)
 
 	t.Run("renders tasks list", func(t *testing.T) {
-		want := []yatta.Task{
+		want := []models.Task{
 			{ID: 0, Description: "eat"},
 			{ID: 1, Description: "sleep"},
 			{ID: 2, Description: "debug tests 🙃"},
@@ -23,7 +25,7 @@ func TestRenderer_TasksList(t *testing.T) {
 
 		htmlString, err := renderer.RenderTaskList(want)
 
-		assertNoError(t, err)
+		yattatest.AssertNoError(t, err)
 		assertHTMLContainsTasks(t, string(htmlString), want, "li")
 	})
 }
@@ -32,13 +34,13 @@ func TestRenderer_Task(t *testing.T) {
 	renderer := mustCreateRenderer(t)
 
 	t.Run("renders task", func(t *testing.T) {
-		want := []yatta.Task{
+		want := []models.Task{
 			{ID: 0, Description: "eat"},
 		}
 
 		htmlString, err := renderer.RenderTask(want[0])
 
-		assertNoError(t, err)
+		yattatest.AssertNoError(t, err)
 		assertHTMLContainsTasks(t, string(htmlString), want, "p")
 	})
 }
@@ -55,15 +57,7 @@ func mustCreateRenderer(t *testing.T) *yatta.HTMLRenderer {
 	return renderer
 }
 
-func assertNoError(t *testing.T, err error) {
-	t.Helper()
-
-	if err != nil {
-		t.Fatalf("an error occurred while rendering the task list: %v", err)
-	}
-}
-
-func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []yatta.Task, containerTag string) {
+func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []models.Task, containerTag string) {
 	t.Helper()
 
 	doc, err := html.Parse(strings.NewReader(htmlString))
