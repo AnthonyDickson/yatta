@@ -8,7 +8,7 @@ Secondly, no React, Angular or Vue! In fact, you probably won't see much JavaScr
 ## Running tests
 
 ```shell
-go test
+go test ./...
 ```
 
 ## Name
