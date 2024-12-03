@@ -5,6 +5,15 @@ What's special about this todo app?
 Well first, _I_ made it. Also, it is my first project in Go.
 Secondly, no React, Angular or Vue! In fact, you probably won't see much JavaScript here, just a little bit of [HTMX](https://htmx.org/) and a whole load of server-side rendering.
 
+## Build and Run Server
+
+```shell
+go build
+./yatta
+```
+
+You can access the web site via [localhost:8000](http://localhost:8000).
+
 ## Running tests
 
 ```shell

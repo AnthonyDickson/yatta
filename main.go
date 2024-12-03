@@ -8,30 +8,19 @@ import (
 	"github.com/AnthonyDickson/yatta/stores"
 )
 
-// TODO: Replace dummy user store with real one
-type DummyUserStore struct{}
-
-func (d *DummyUserStore) CreateUser(email, password string) error {
-	return nil
-}
-
-const dbFileName = "todos.db.json"
+const taskDBFileName = "todos.db.json"
+const userDBFileName = "users.db.json"
 
 func main() {
-	database, err := os.OpenFile(dbFileName, os.O_RDWR|os.O_CREATE, 0666)
-
-	if err != nil {
-		log.Fatalf("could not open file %s: %v", dbFileName, err)
-	}
-
-	store := stores.NewFileTaskStore(database)
+	userStore := createUserStore()
+	taskStore := createTaskStore()
 	renderer, err := NewHTMLRenderer()
 
 	if err != nil {
 		log.Fatalf("an error occurred while creating the HTML renderer: %v", err)
 	}
 
-	server, err := NewServer(store, new(DummyUserStore), renderer)
+	server, err := NewServer(taskStore, userStore, renderer)
 
 	if err != nil {
 		log.Fatalf("an error occurred while creating the server: %v", err)
@@ -39,4 +28,36 @@ func main() {
 
 	handler := http.Handler(server)
 	log.Fatal(http.ListenAndServe(":8000", handler))
+}
+
+func createTaskStore() *stores.FileTaskStore {
+	database, err := os.OpenFile(taskDBFileName, os.O_RDWR|os.O_CREATE, 0666)
+
+	if err != nil {
+		log.Fatalf("could not open file %s: %v", taskDBFileName, err)
+	}
+
+	store, err := stores.NewFileTaskStore(database)
+
+	if err != nil {
+		log.Fatalf("could not load the file task store: %v", err)
+	}
+
+	return store
+}
+
+func createUserStore() *stores.FileUserStore {
+	database, err := os.OpenFile(userDBFileName, os.O_RDWR|os.O_CREATE, 0666)
+
+	if err != nil {
+		log.Fatalf("could not open file %s: %v", userDBFileName, err)
+	}
+
+	store, err := stores.NewFileUserStore(database)
+
+	if err != nil {
+		log.Fatalf("could not load the user task store: %v", err)
+	}
+
+	return store
 }

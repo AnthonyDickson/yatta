@@ -85,8 +85,12 @@ func (s *StubTaskStore) AddTask(user string, task string) error {
 
 type DummyUserStore struct{}
 
-func (d *DummyUserStore) CreateUser(email, password string) error {
+func (d *DummyUserStore) AddUser(email, password string) error {
 	return nil
+}
+
+func (d *DummyUserStore) GetUser(id uint64) (*models.User, error) {
+	return nil, nil
 }
 
 func TestGetCoffee(t *testing.T) {
@@ -282,9 +286,13 @@ type SpyUserStore struct {
 	createUserCalls []createUserCall
 }
 
-func (s *SpyUserStore) CreateUser(email, password string) error {
+func (s *SpyUserStore) AddUser(email, password string) error {
 	s.createUserCalls = append(s.createUserCalls, createUserCall{email, password})
 	return nil
+}
+
+func (s *SpyUserStore) GetUser(id uint64) (*models.User, error) {
+	return nil, nil
 }
 
 func TestCreateUser(t *testing.T) {

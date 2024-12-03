@@ -11,21 +11,27 @@ import (
 
 // Persists tasks to disk.
 type FileTaskStore struct {
-	database *os.File
+	database  *json.Encoder
+	taskLists taskLists
 }
 
-func NewFileTaskStore(database *os.File) *FileTaskStore {
-	return &FileTaskStore{database: database}
+func NewFileTaskStore(database *os.File) (*FileTaskStore, error) {
+	taskLists, err := newTaskLists(database)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not parse task lists: %v", err)
+	}
+
+	store := &FileTaskStore{
+		database:  json.NewEncoder(&tape{database}),
+		taskLists: taskLists,
+	}
+
+	return store, nil
 }
 
 func (f *FileTaskStore) GetTasks(user string) ([]models.Task, error) {
-	taskLists, err := f.getTaskLists()
-
-	if err != nil {
-		return nil, fmt.Errorf("could not get tasks: %v", err)
-	}
-
-	taskList := taskLists.find(user)
+	taskList := f.taskLists.find(user)
 
 	if taskList != nil {
 		return taskList.Tasks, nil
@@ -35,13 +41,7 @@ func (f *FileTaskStore) GetTasks(user string) ([]models.Task, error) {
 }
 
 func (f *FileTaskStore) GetTask(id uint64) (*models.Task, error) {
-	taskLists, err := f.getTaskLists()
-
-	if err != nil {
-		return nil, fmt.Errorf("could not get tasks: %v", err)
-	}
-
-	for _, taskList := range *taskLists {
+	for _, taskList := range f.taskLists {
 		for _, task := range taskList.Tasks {
 			if task.ID == id {
 				return &task, nil
@@ -53,52 +53,17 @@ func (f *FileTaskStore) GetTask(id uint64) (*models.Task, error) {
 }
 
 func (f *FileTaskStore) AddTask(user string, description string) error {
-	taskLists, err := f.getTaskLists()
-
-	if err != nil {
-		return fmt.Errorf("could not get tasks: %v", err)
-	}
-
-	userTaskList := taskLists.find(user)
-	task := models.Task{ID: 0, Description: description}
+	userTaskList := f.taskLists.find(user)
+	id := f.taskLists.nextID()
+	task := models.Task{ID: id, Description: description}
 
 	if userTaskList != nil {
 		userTaskList.Tasks = append(userTaskList.Tasks, task)
 	} else {
-		*taskLists = append(*taskLists, taskList{user, []models.Task{task}})
+		f.taskLists = append(f.taskLists, taskList{user, []models.Task{task}})
 	}
 
-	return f.updateDatabase(taskLists)
-}
-
-func (f *FileTaskStore) getTaskLists() (*taskLists, error) {
-	_, err := f.database.Seek(0, io.SeekStart)
-
-	if err != nil {
-		return nil, fmt.Errorf("could not seek to the start of the database file: %v", err)
-	}
-
-	taskLists, err := newTaskLists(f.database)
-
-	return &taskLists, err
-}
-
-func (f *FileTaskStore) updateDatabase(taskLists *taskLists) error {
-	err := f.database.Truncate(0) // prevents writes that are smaller than previous file from leading to invalid JSON
-
-	if err != nil {
-		return fmt.Errorf("could not truncate database file to prepare for write: %v", err)
-	}
-
-	_, err = f.database.Seek(0, io.SeekStart)
-
-	if err != nil {
-		return fmt.Errorf("could not seek database file: %v", err)
-	}
-
-	err = json.NewEncoder(f.database).Encode(taskLists)
-
-	return err
+	return f.database.Encode(f.taskLists)
 }
 
 // A list of tasks for a user.
@@ -111,6 +76,12 @@ type taskLists []taskList
 
 // Parse a list of tasksList objects from `database`.
 func newTaskLists(database *os.File) (taskLists, error) {
+	_, err := database.Seek(0, io.SeekStart)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not seek database file: %v", err)
+	}
+
 	data, err := io.ReadAll(database)
 
 	if err != nil {
@@ -142,4 +113,17 @@ func (t taskLists) find(user string) *taskList {
 	}
 
 	return nil
+}
+
+// Use this function when setting the ID of a new task to ensure that the ID is auto-incremented and unique.
+func (t taskLists) nextID() (id uint64) {
+	id = 0
+
+	for _, taskList := range t {
+		for _, task := range taskList.Tasks {
+			id = max(id, task.ID)
+		}
+	}
+
+	return id + 1
 }

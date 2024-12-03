@@ -149,7 +149,7 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	email := r.Form.Get("email")
 	password := r.Form.Get("password")
 
-	err = s.userStore.CreateUser(email, password)
+	err = s.userStore.AddUser(email, password)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

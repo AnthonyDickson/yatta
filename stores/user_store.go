@@ -1,5 +1,10 @@
 package stores
 
+import (
+	"github.com/AnthonyDickson/yatta/models"
+)
+
 type UserStore interface {
-	CreateUser(email, password string) error
+	AddUser(email, password string) error
+	GetUser(id uint64) (*models.User, error)
 }
