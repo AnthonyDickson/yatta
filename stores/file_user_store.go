@@ -57,8 +57,9 @@ func loadUserStore(database *os.File) (userList, error) {
 	return users, nil
 }
 
-func (f *FileUserStore) AddUser(email, password string) error {
+func (f *FileUserStore) AddUser(email string, password *models.PasswordHash) error {
 	nextID := f.users.nextID()
+
 	f.users = append(f.users, models.User{ID: nextID, Email: email, Password: password})
 
 	return f.database.Encode(f.users)

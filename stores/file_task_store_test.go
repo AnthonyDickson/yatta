@@ -16,16 +16,16 @@ func TestFileTaskStore(t *testing.T) {
         {
           "user": "Alice", 
           "tasks": [
-            {"ID": 0, "Description": "send message to Bob"},
-            {"ID": 1, "Description": "upgrade encryption"},
-            {"ID": 2, "Description": "read message from Bob"}
+            {"ID": 1, "Description": "send message to Bob"},
+            {"ID": 2, "Description": "upgrade encryption"},
+            {"ID": 3, "Description": "read message from Bob"}
           ]
         },
         {
           "user": "Bob",
           "tasks": [
-            {"ID": 3, "Description": "read message from Alice"},
-            {"ID": 4, "Description": "send message to Alice"}
+            {"ID": 4, "Description": "read message from Alice"},
+            {"ID": 5, "Description": "send message to Alice"}
           ]
         }
       ]`)
@@ -34,13 +34,13 @@ func TestFileTaskStore(t *testing.T) {
 		store := mustCreateFileTaskStore(t, database)
 
 		assertTasks(t, store, "Alice", []models.Task{
-			{ID: 0, Description: "send message to Bob"},
-			{ID: 1, Description: "upgrade encryption"},
-			{ID: 2, Description: "read message from Bob"},
+			{ID: 1, Description: "send message to Bob"},
+			{ID: 2, Description: "upgrade encryption"},
+			{ID: 3, Description: "read message from Bob"},
 		})
 		assertTasks(t, store, "Bob", []models.Task{
-			{ID: 3, Description: "read message from Alice"},
-			{ID: 4, Description: "send message to Alice"},
+			{ID: 4, Description: "read message from Alice"},
+			{ID: 5, Description: "send message to Alice"},
 		})
 	})
 

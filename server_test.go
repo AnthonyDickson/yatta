@@ -85,7 +85,7 @@ func (s *StubTaskStore) AddTask(user string, task string) error {
 
 type DummyUserStore struct{}
 
-func (d *DummyUserStore) AddUser(email, password string) error {
+func (d *DummyUserStore) AddUser(email string, password *models.PasswordHash) error {
 	return nil
 }
 
@@ -277,17 +277,22 @@ func (d *DummyRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
 	return nil, nil
 }
 
-type createUserCall struct {
+type createUserRequestData struct {
 	Email    string
 	Password string
 }
 
-type SpyUserStore struct {
-	createUserCalls []createUserCall
+type addUserCall struct {
+	Email    string
+	Password *models.PasswordHash
 }
 
-func (s *SpyUserStore) AddUser(email, password string) error {
-	s.createUserCalls = append(s.createUserCalls, createUserCall{email, password})
+type SpyUserStore struct {
+	createUserCalls []addUserCall
+}
+
+func (s *SpyUserStore) AddUser(email string, password *models.PasswordHash) error {
+	s.createUserCalls = append(s.createUserCalls, addUserCall{email, password})
 	return nil
 }
 
@@ -297,22 +302,22 @@ func (s *SpyUserStore) GetUser(id uint64) (*models.User, error) {
 
 func TestCreateUser(t *testing.T) {
 	t.Run("can create a new user", func(t *testing.T) {
-		cases := []createUserCall{
+		cases := []createUserRequestData{
 			{"test@test.com", "hunter2"},
 			{"foo@bar.com", "baz"},
 		}
 
-		for _, want := range cases {
+		for _, c := range cases {
 			store := new(SpyUserStore)
 
 			server := mustCreateServer(t, new(DummyTaskStore), store, new(DummyRenderer))
-			request := newCreateUserRequest(t, want)
+			request := newCreateUserRequest(t, c)
 			response := httptest.NewRecorder()
 
 			server.ServeHTTP(response, request)
 
 			assertStatus(t, response, http.StatusAccepted)
-			assertCreateUserCalls(t, store, want)
+			assertAddUserCalls(t, store, c)
 		}
 	})
 
@@ -349,7 +354,7 @@ func TestCreateUser(t *testing.T) {
 	// TODO: validate emails for formatting and uniqueness, and passwords for strength.
 }
 
-func newCreateUserRequest(t *testing.T, user createUserCall) *http.Request {
+func newCreateUserRequest(t *testing.T, user createUserRequestData) *http.Request {
 	t.Helper()
 
 	request := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(fmt.Sprintf("email=%s&password=%s", user.Email, user.Password)))
@@ -358,7 +363,7 @@ func newCreateUserRequest(t *testing.T, user createUserCall) *http.Request {
 	return request
 }
 
-func assertCreateUserCalls(t *testing.T, store *SpyUserStore, want createUserCall) {
+func assertAddUserCalls(t *testing.T, store *SpyUserStore, want createUserRequestData) {
 	t.Helper()
 
 	if len(store.createUserCalls) != 1 {
@@ -367,7 +372,7 @@ func assertCreateUserCalls(t *testing.T, store *SpyUserStore, want createUserCal
 
 	got := store.createUserCalls[0]
 
-	if got != want {
+	if got.Email != want.Email || got.Password.Compare(want.Password) != nil {
 		t.Errorf("got call to CreateUser with arguments %v, want %v", got, want)
 	}
 }

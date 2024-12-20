@@ -8,7 +8,9 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/AnthonyDickson/yatta/models"
 	"github.com/AnthonyDickson/yatta/stores"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const htmlContentType = "text/html"
@@ -148,8 +150,15 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 
 	email := r.Form.Get("email")
 	password := r.Form.Get("password")
+	hash, err := models.NewPasswordHash(password, bcrypt.DefaultCost)
 
-	err = s.userStore.AddUser(email, password)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error(fmt.Sprintf("could not create password hash: %v", err))
+		return
+	}
+
+	err = s.userStore.AddUser(email, hash)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

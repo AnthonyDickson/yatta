@@ -1,7 +1,7 @@
-// TODO: Hash and salt passwords.
 package stores_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -12,26 +12,26 @@ import (
 
 func TestFileUserStore_New(t *testing.T) {
 	t.Run("load store from file", func(t *testing.T) {
-		database, cleanup := yattatest.CreateTempFile(t, `[
+		want_users := []models.User{
+			{ID: 0, Email: "alice@example.com", Password: yattatest.MustCreatePasswordHash(t, "averysecretpassword")},
+			{ID: 1, Email: "bob@example.com", Password: yattatest.MustCreatePasswordHash(t, "anotherverysecretpassword")},
+		}
+
+		database, cleanup := yattatest.CreateTempFile(t, fmt.Sprintf(`[
         {
           "ID": 0,
           "Email": "alice@example.com",
-          "Password": "averysecretpassword"
+          "Password": %q
         },
         {
           "ID": 1,
           "Email": "bob@example.com",
-          "Password": "anotherverysecretpassword"
+          "Password": %q
         }
-      ]`)
+      ]`, want_users[0].Password.Hash, want_users[1].Password.Hash))
 		defer cleanup()
 
 		store := mustCreateFileUserStore(t, database)
-
-		want_users := []models.User{
-			{ID: 0, Email: "alice@example.com", Password: "averysecretpassword"},
-			{ID: 1, Email: "bob@example.com", Password: "anotherverysecretpassword"},
-		}
 
 		assertStoreHasUsers(t, store, want_users)
 	})
@@ -41,9 +41,9 @@ func TestFileUserStore_Add(t *testing.T) {
 	t.Run("adding new user updates store and database file", func(t *testing.T) {
 		database, cleanup := yattatest.CreateTempFile(t, "")
 		defer cleanup()
-
 		store := mustCreateFileUserStore(t, database)
-		want := models.User{ID: 1, Email: "test@example.com", Password: "averysecretpassword"}
+
+		want := models.User{ID: 1, Email: "test@example.com", Password: yattatest.MustCreatePasswordHash(t, "averysecretpassword")}
 
 		err := store.AddUser(want.Email, want.Password)
 		yattatest.AssertNoError(t, err)
@@ -59,8 +59,8 @@ func TestFileUserStore_Add(t *testing.T) {
 
 		store := mustCreateFileUserStore(t, database)
 		want := []models.User{
-			{ID: 1, Email: "test@example.com", Password: "averysecretpassword"},
-			{ID: 2, Email: "test2@example.com", Password: "anotherverysecretpassword"},
+			{ID: 1, Email: "test@example.com", Password: yattatest.MustCreatePasswordHash(t, "averysecretpassword")},
+			{ID: 2, Email: "test2@example.com", Password: yattatest.MustCreatePasswordHash(t, "anotherverysecretpassword")},
 		}
 
 		for _, user := range want {
@@ -88,14 +88,14 @@ func assertStoreHasUsers(t *testing.T, store *stores.FileUserStore, want_users [
 	t.Helper()
 
 	for _, want := range want_users {
-		got, error := store.GetUser(want.ID)
-		yattatest.AssertNoError(t, error)
+		got, err := store.GetUser(want.ID)
+		yattatest.AssertNoError(t, err)
 
 		if got == nil {
 			t.Fatalf("got nil user, want %v", want)
 		}
 
-		if *got != want {
+		if got.ID != want.ID || got.Email != want.Email {
 			t.Errorf("got user %v, want %v", *got, want)
 		}
 	}

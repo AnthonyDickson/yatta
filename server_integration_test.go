@@ -21,13 +21,15 @@ func TestCreateAndGetTasks(t *testing.T) {
 	server := mustCreateServer(t, taskStore, userStore, renderer)
 
 	email := "Pierre.Joseph@Proudhorn.fr"
-	want_user := models.User{ID: 1, Email: email, Password: "propertyistheft"}
-	want_tasks := []models.Task{{ID: 0, Description: "write a book"}, {ID: 0, Description: "Become ungovernable."}}
+	raw_password := "propertyistheft"
 
-	server.ServeHTTP(httptest.NewRecorder(), newCreateUserRequest(t, createUserCall{
-		Email:    want_user.Email,
-		Password: want_user.Password,
-	}))
+	want_user := createUserRequestData{
+		Email:    email,
+		Password: raw_password,
+	}
+	want_tasks := []models.Task{{ID: 0, Description: "write a book"}, {ID: 1, Description: "Become ungovernable."}}
+
+	server.ServeHTTP(httptest.NewRecorder(), newCreateUserRequest(t, want_user))
 
 	for _, task := range want_tasks {
 		server.ServeHTTP(httptest.NewRecorder(), newCreateTasksRequest(t, email, task.Description))
@@ -38,7 +40,7 @@ func TestCreateAndGetTasks(t *testing.T) {
 
 	assertStatus(t, response, http.StatusOK)
 	assertHTMLContainsTasks(t, response.Body.String(), want_tasks, "li")
-	assertStoreHasUser(t, userStore, want_user)
+	assertStoreHasUser(t, userStore, 1, want_user)
 }
 
 func mustCreateFileUserStore(t *testing.T, initialData string) (*stores.FileUserStore, func()) {
@@ -69,17 +71,21 @@ func mustCreateFileTaskStore(t *testing.T, initialData string) (*stores.FileTask
 	return store, cleanup
 }
 
-func assertStoreHasUser(t *testing.T, store *stores.FileUserStore, want models.User) {
+func assertStoreHasUser(t *testing.T, store *stores.FileUserStore, want_id uint64, want createUserRequestData) {
 	t.Helper()
 
-	got_user, err := store.GetUser(want.ID)
+	got_user, err := store.GetUser(want_id)
 	yattatest.AssertNoError(t, err)
 
 	if got_user == nil {
 		t.Fatalf("got nil user, want %v", want)
 	}
 
-	if *got_user != want {
-		t.Errorf("got user %v, want %v", *got_user, want)
+	if got_user.Email != want.Email {
+		t.Errorf("got email %v, want %v", got_user.Email, want.Email)
+	}
+
+	if got_user.Password.Compare(want.Password) != nil {
+		t.Errorf("hash %s does not verify password %q", got_user.Password, want.Password)
 	}
 }
