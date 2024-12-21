@@ -28,3 +28,6 @@ go.work.sum
 # The database files
 todos.db.json
 users.db.json
+
+# temp dir for air
+tmp/
