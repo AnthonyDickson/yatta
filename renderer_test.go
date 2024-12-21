@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -12,6 +13,20 @@ import (
 	"github.com/AnthonyDickson/yatta/yattatest"
 	"golang.org/x/net/html"
 )
+
+func TestRenderer_Index(t *testing.T) {
+	t.Run("renders index page", func(t *testing.T) {
+		renderer := mustCreateRenderer(t)
+		users := []models.User{
+			{ID: 1, Email: "test@example.com", Password: yattatest.MustCreatePasswordHash(t, "test")},
+			{ID: 2, Email: "foo@bar.com", Password: yattatest.MustCreatePasswordHash(t, "baz")},
+		}
+
+		htmlString, err := renderer.RenderIndex(users)
+		yattatest.AssertNoError(t, err)
+		assertHTMLContainsUsers(t, string(htmlString), users, "a")
+	})
+}
 
 func TestRenderer_TasksList(t *testing.T) {
 	renderer := mustCreateRenderer(t)
@@ -66,7 +81,7 @@ func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []models.Tas
 		t.Fatalf("an error occurred while parsing the HTML string: %v", err)
 	}
 
-	got := extractTasksFromHTML(t, doc, containerTag)
+	got := extractTextNodesFromHTML(t, doc, containerTag)
 
 	var want []string
 
@@ -80,7 +95,25 @@ func assertHTMLContainsTasks(t *testing.T, htmlString string, tasks []models.Tas
 	}
 }
 
-func extractTasksFromHTML(t *testing.T, htmlFragment *html.Node, containerTag string) []string {
+func assertHTMLContainsUsers(t *testing.T, htmlString string, users []models.User, containerTag string) {
+	t.Helper()
+
+	doc, err := html.Parse(strings.NewReader(htmlString))
+
+	if err != nil {
+		t.Fatalf("an error occurred while parsing the HTML string: %v", err)
+	}
+
+	got := extractTextNodesFromHTML(t, doc, containerTag)
+
+	for _, user := range users {
+		if !slices.Contains(got, user.Email) {
+			t.Errorf("could not find user %q in the HTML", user.Email)
+		}
+	}
+}
+
+func extractTextNodesFromHTML(t *testing.T, htmlFragment *html.Node, containerTag string) []string {
 	t.Helper()
 
 	tasks := []string{}

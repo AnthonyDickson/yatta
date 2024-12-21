@@ -11,4 +11,7 @@ type UserStore interface {
 
 	// GetUser retrieves a user by their ID.
 	GetUser(id uint64) (*models.User, error)
+
+	// GetUsers retrieves all users.
+	GetUsers() ([]models.User, error)
 }

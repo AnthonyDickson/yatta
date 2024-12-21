@@ -7,6 +7,6 @@ func AssertNoError(t *testing.T, err error) {
 	t.Helper()
 
 	if err != nil {
-		t.Fatalf("got an error %v, want no error", err)
+		t.Fatalf("got an error %q, want no error", err)
 	}
 }

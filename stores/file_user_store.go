@@ -69,6 +69,10 @@ func (f *FileUserStore) GetUser(id uint64) (*models.User, error) {
 	return f.users.find(id), nil
 }
 
+func (f *FileUserStore) GetUsers() ([]models.User, error) {
+	return f.users, nil
+}
+
 type userList []models.User
 
 func (u userList) find(id uint64) *models.User {

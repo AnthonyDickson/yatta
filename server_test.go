@@ -12,86 +12,8 @@ import (
 	yatta "github.com/AnthonyDickson/yatta"
 	"github.com/AnthonyDickson/yatta/models"
 	"github.com/AnthonyDickson/yatta/stores"
+	"github.com/AnthonyDickson/yatta/yattatest"
 )
-
-const htmlContentType = "text/html"
-
-type addTaskCall struct {
-	user string
-	task string
-}
-
-type getTasksCall struct {
-	user  string
-	tasks []models.Task
-}
-
-type getTaskCall struct {
-	id   uint64
-	task *models.Task
-}
-
-type StubTaskStore struct {
-	store         map[string][]models.Task
-	addCalls      []addTaskCall
-	getTasksCalls []getTasksCall
-	getTaskCalls  []getTaskCall
-}
-
-func (s *StubTaskStore) GetTasks(user string) ([]models.Task, error) {
-	tasks := s.store[user]
-
-	s.getTasksCalls = append(s.getTasksCalls, getTasksCall{user, tasks})
-
-	return tasks, nil
-}
-
-func (s *StubTaskStore) GetTask(id uint64) (*models.Task, error) {
-	for _, tasks := range s.store {
-		for _, task := range tasks {
-			if task.ID == id {
-				s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: &task})
-				return &task, nil
-			}
-		}
-	}
-
-	s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: nil})
-	return nil, nil
-}
-
-type SpyRenderer struct {
-	renderTasksCalls [][]models.Task
-	renderTaskCalls  []models.Task
-}
-
-func (s *SpyRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
-	s.renderTasksCalls = append(s.renderTasksCalls, tasks)
-
-	return nil, nil
-}
-
-func (s *SpyRenderer) RenderTask(task models.Task) ([]byte, error) {
-	s.renderTaskCalls = append(s.renderTaskCalls, task)
-
-	return nil, nil
-}
-
-func (s *StubTaskStore) AddTask(user string, task string) error {
-	s.addCalls = append(s.addCalls, addTaskCall{user, task})
-
-	return nil
-}
-
-type DummyUserStore struct{}
-
-func (d *DummyUserStore) AddUser(email string, password *models.PasswordHash) error {
-	return nil
-}
-
-func (d *DummyUserStore) GetUser(id uint64) (*models.User, error) {
-	return nil, nil
-}
 
 func TestGetCoffee(t *testing.T) {
 	t.Run("returns status 418", func(t *testing.T) {
@@ -103,6 +25,25 @@ func TestGetCoffee(t *testing.T) {
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusTeapot)
+	})
+}
+
+func TestGetIndex(t *testing.T) {
+	t.Run("returns status 200", func(t *testing.T) {
+		users := []models.User{
+			{ID: 1, Email: "foo@bar.baz", Password: yattatest.MustCreatePasswordHash(t, "qux")},
+			{ID: 2, Email: "test@example.com", Password: yattatest.MustCreatePasswordHash(t, "hunter2")},
+		}
+		userStore := &StubUserStore{users: users}
+		renderer := new(SpyRenderer)
+		server := mustCreateServer(t, new(StubTaskStore), userStore, renderer)
+
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/", nil)
+		server.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusOK)
+		assertRenderIndexCall(t, renderer, users)
 	})
 }
 
@@ -223,7 +164,7 @@ func TestCreateTasks(t *testing.T) {
 		server.ServeHTTP(response, request)
 
 		assertStatus(t, response, http.StatusAccepted)
-		assertAddCalls(t, store, []addTaskCall{want})
+		assertAddTaskCalls(t, store, []addTaskCall{want})
 	})
 
 	t.Run("create multiple tasks", func(t *testing.T) {
@@ -247,57 +188,8 @@ func TestCreateTasks(t *testing.T) {
 			assertStatus(t, response, http.StatusAccepted)
 		}
 
-		assertAddCalls(t, store, cases)
+		assertAddTaskCalls(t, store, cases)
 	})
-}
-
-const formContentType = "application/x-www-form-urlencoded"
-
-type DummyTaskStore struct{}
-
-func (d *DummyTaskStore) GetTask(id uint64) (*models.Task, error) {
-	return nil, nil
-}
-
-func (d *DummyTaskStore) GetTasks(user string) ([]models.Task, error) {
-	return nil, nil
-}
-
-func (d *DummyTaskStore) AddTask(user string, description string) error {
-	return nil
-}
-
-type DummyRenderer struct{}
-
-func (d *DummyRenderer) RenderTask(task models.Task) ([]byte, error) {
-	return nil, nil
-}
-
-func (d *DummyRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
-	return nil, nil
-}
-
-type createUserRequestData struct {
-	Email    string
-	Password string
-}
-
-type addUserCall struct {
-	Email    string
-	Password *models.PasswordHash
-}
-
-type SpyUserStore struct {
-	createUserCalls []addUserCall
-}
-
-func (s *SpyUserStore) AddUser(email string, password *models.PasswordHash) error {
-	s.createUserCalls = append(s.createUserCalls, addUserCall{email, password})
-	return nil
-}
-
-func (s *SpyUserStore) GetUser(id uint64) (*models.User, error) {
-	return nil, nil
 }
 
 func TestCreateUser(t *testing.T) {
@@ -354,27 +246,165 @@ func TestCreateUser(t *testing.T) {
 	// TODO: validate emails for formatting and uniqueness, and passwords for strength.
 }
 
-func newCreateUserRequest(t *testing.T, user createUserRequestData) *http.Request {
-	t.Helper()
+const htmlContentType = "text/html"
+const formContentType = "application/x-www-form-urlencoded"
 
-	request := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(fmt.Sprintf("email=%s&password=%s", user.Email, user.Password)))
-	request.Header.Add("Content-Type", formContentType)
-
-	return request
+type addTaskCall struct {
+	user string
+	task string
 }
 
-func assertAddUserCalls(t *testing.T, store *SpyUserStore, want createUserRequestData) {
-	t.Helper()
+type getTasksCall struct {
+	user  string
+	tasks []models.Task
+}
 
-	if len(store.createUserCalls) != 1 {
-		t.Fatalf("got %d calls to CreateUser, want 1", len(store.createUserCalls))
+type getTaskCall struct {
+	id   uint64
+	task *models.Task
+}
+
+type StubTaskStore struct {
+	store         map[string][]models.Task
+	addCalls      []addTaskCall
+	getTasksCalls []getTasksCall
+	getTaskCalls  []getTaskCall
+}
+
+func (s *StubTaskStore) GetTasks(user string) ([]models.Task, error) {
+	tasks := s.store[user]
+
+	s.getTasksCalls = append(s.getTasksCalls, getTasksCall{user, tasks})
+
+	return tasks, nil
+}
+
+func (s *StubTaskStore) GetTask(id uint64) (*models.Task, error) {
+	for _, tasks := range s.store {
+		for _, task := range tasks {
+			if task.ID == id {
+				s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: &task})
+				return &task, nil
+			}
+		}
 	}
 
-	got := store.createUserCalls[0]
+	s.getTaskCalls = append(s.getTaskCalls, getTaskCall{id: id, task: nil})
+	return nil, nil
+}
 
-	if got.Email != want.Email || got.Password.Compare(want.Password) != nil {
-		t.Errorf("got call to CreateUser with arguments %v, want %v", got, want)
-	}
+type SpyRenderer struct {
+	renderIndexCalls [][]models.User
+	renderTasksCalls [][]models.Task
+	renderTaskCalls  []models.Task
+}
+
+func (s *SpyRenderer) RenderIndex(users []models.User) ([]byte, error) {
+	s.renderIndexCalls = append(s.renderIndexCalls, users)
+	return nil, nil
+}
+
+func (s *SpyRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
+	s.renderTasksCalls = append(s.renderTasksCalls, tasks)
+
+	return nil, nil
+}
+
+func (s *SpyRenderer) RenderTask(task models.Task) ([]byte, error) {
+	s.renderTaskCalls = append(s.renderTaskCalls, task)
+
+	return nil, nil
+}
+
+func (s *StubTaskStore) AddTask(user string, task string) error {
+	s.addCalls = append(s.addCalls, addTaskCall{user, task})
+
+	return nil
+}
+
+type DummyUserStore struct{}
+
+func (d *DummyUserStore) AddUser(email string, password *models.PasswordHash) error {
+	return nil
+}
+
+func (d *DummyUserStore) GetUser(id uint64) (*models.User, error) {
+	return nil, nil
+}
+
+func (d *DummyUserStore) GetUsers() ([]models.User, error) {
+	return nil, nil
+}
+
+type DummyTaskStore struct{}
+
+func (d *DummyTaskStore) GetTask(id uint64) (*models.Task, error) {
+	return nil, nil
+}
+
+func (d *DummyTaskStore) GetTasks(user string) ([]models.Task, error) {
+	return nil, nil
+}
+
+func (d *DummyTaskStore) AddTask(user string, description string) error {
+	return nil
+}
+
+type DummyRenderer struct{}
+
+func (d *DummyRenderer) RenderIndex(users []models.User) ([]byte, error) {
+	return nil, nil
+}
+
+func (d *DummyRenderer) RenderTask(task models.Task) ([]byte, error) {
+	return nil, nil
+}
+
+func (d *DummyRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
+	return nil, nil
+}
+
+type createUserRequestData struct {
+	Email    string
+	Password string
+}
+
+type addUserCall struct {
+	Email    string
+	Password *models.PasswordHash
+}
+
+type StubUserStore struct {
+	users []models.User
+}
+
+func (s *StubUserStore) AddUser(email string, password *models.PasswordHash) error {
+	return nil
+}
+
+func (s *StubUserStore) GetUser(id uint64) (*models.User, error) {
+	return &s.users[id], nil
+}
+
+func (s *StubUserStore) GetUsers() ([]models.User, error) {
+	return s.users, nil
+}
+
+type SpyUserStore struct {
+	createUserCalls []addUserCall
+}
+
+func (s *SpyUserStore) AddUser(email string, password *models.PasswordHash) error {
+	s.createUserCalls = append(s.createUserCalls, addUserCall{email, password})
+	return nil
+}
+
+func (s *SpyUserStore) GetUser(id uint64) (*models.User, error) {
+	return nil, nil
+}
+
+func (s *SpyUserStore) GetUsers() ([]models.User, error) {
+	return nil, nil
 }
 
 func mustCreateServer(t *testing.T, taskStore stores.TaskStore, userStore stores.UserStore, renderer yatta.Renderer) *yatta.Server {
@@ -387,6 +417,15 @@ func mustCreateServer(t *testing.T, taskStore stores.TaskStore, userStore stores
 	}
 
 	return server
+}
+
+func newCreateUserRequest(t *testing.T, user createUserRequestData) *http.Request {
+	t.Helper()
+
+	request := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(fmt.Sprintf("email=%s&password=%s", user.Email, user.Password)))
+	request.Header.Add("Content-Type", formContentType)
+
+	return request
 }
 
 func newGetCoffeeRequest(t *testing.T) *http.Request {
@@ -446,7 +485,7 @@ func assertContentType(t *testing.T, response *httptest.ResponseRecorder, want s
 	}
 }
 
-func assertAddCalls(t *testing.T, store *StubTaskStore, wantCalls []addTaskCall) {
+func assertAddTaskCalls(t *testing.T, store *StubTaskStore, wantCalls []addTaskCall) {
 	t.Helper()
 
 	if len(store.addCalls) != len(wantCalls) {
@@ -467,36 +506,6 @@ func assertAddCalls(t *testing.T, store *StubTaskStore, wantCalls []addTaskCall)
 	}
 }
 
-func assertGetTasksCall(t *testing.T, store *StubTaskStore, want getTasksCall) {
-	t.Helper()
-
-	calls := store.getTasksCalls
-
-	if len(calls) != 1 {
-		t.Errorf("got %d call(s) to GetTasks want 1", len(calls))
-	}
-
-	got := calls[0]
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got calls to GetTasks %q, want %q", got, want)
-	}
-}
-
-func assertRenderTasksCall(t *testing.T, renderer *SpyRenderer, want []models.Task) {
-	t.Helper()
-
-	if len(renderer.renderTasksCalls) != 1 {
-		t.Fatalf("got %d calls to RenderTasksList, want 1", len(renderer.renderTasksCalls))
-	}
-
-	got := renderer.renderTasksCalls[0]
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got calls to RenderTasksList %q, want %q", got, want)
-	}
-}
-
 func assertGetTaskCall(t *testing.T, store *StubTaskStore, want models.Task) {
 	t.Helper()
 
@@ -513,6 +522,50 @@ func assertGetTaskCall(t *testing.T, store *StubTaskStore, want models.Task) {
 	}
 }
 
+func assertGetTasksCall(t *testing.T, store *StubTaskStore, want getTasksCall) {
+	t.Helper()
+
+	calls := store.getTasksCalls
+
+	if len(calls) != 1 {
+		t.Errorf("got %d call(s) to GetTasks want 1", len(calls))
+	}
+
+	got := calls[0]
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got calls to GetTasks %q, want %q", got, want)
+	}
+}
+
+func assertAddUserCalls(t *testing.T, store *SpyUserStore, want createUserRequestData) {
+	t.Helper()
+
+	if len(store.createUserCalls) != 1 {
+		t.Fatalf("got %d calls to CreateUser, want 1", len(store.createUserCalls))
+	}
+
+	got := store.createUserCalls[0]
+
+	if got.Email != want.Email || got.Password.Compare(want.Password) != nil {
+		t.Errorf("got call to CreateUser with arguments %v, want %v", got, want)
+	}
+}
+
+func assertRenderIndexCall(t *testing.T, renderer *SpyRenderer, want []models.User) {
+	t.Helper()
+
+	if len(renderer.renderIndexCalls) != 1 {
+		t.Fatalf("got %d calls to RenderIndex, want 1", len(renderer.renderIndexCalls))
+	}
+
+	got := renderer.renderIndexCalls[0]
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got call to RenderIndex with users %v, want call with users %v", got, want)
+	}
+}
+
 func assertRenderTaskCall(t *testing.T, renderer *SpyRenderer, want models.Task) {
 	t.Helper()
 
@@ -524,5 +577,19 @@ func assertRenderTaskCall(t *testing.T, renderer *SpyRenderer, want models.Task)
 
 	if got != want {
 		t.Errorf("got call to RenderTask with task %q, want call with task %q", got, want)
+	}
+}
+
+func assertRenderTasksCall(t *testing.T, renderer *SpyRenderer, want []models.Task) {
+	t.Helper()
+
+	if len(renderer.renderTasksCalls) != 1 {
+		t.Fatalf("got %d calls to RenderTasksList, want 1", len(renderer.renderTasksCalls))
+	}
+
+	got := renderer.renderTasksCalls[0]
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got calls to RenderTasksList %q, want %q", got, want)
 	}
 }

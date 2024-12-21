@@ -29,6 +29,7 @@ func NewServer(taskStore stores.TaskStore, userStore stores.UserStore, renderer 
 
 	router := http.NewServeMux()
 	router.Handle("GET /coffee", http.HandlerFunc(server.getCoffee))
+	router.Handle("GET /", http.HandlerFunc(server.getRoot))
 	router.Handle("GET /tasks/{id}", http.HandlerFunc(server.getTask))
 	router.Handle("GET /users/{user}/tasks", http.HandlerFunc(server.getTasks))
 	router.Handle("POST /users/{user}/tasks", http.HandlerFunc(server.addTask))
@@ -43,6 +44,19 @@ func NewServer(taskStore stores.TaskStore, userStore stores.UserStore, renderer 
 
 func (s *Server) getCoffee(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTeapot)
+}
+
+func (s *Server) getRoot(w http.ResponseWriter, r *http.Request) {
+	users, err := s.userStore.GetUsers()
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error(fmt.Sprintf("could not get users: %v", err))
+		return
+	}
+
+	body, err := s.renderer.RenderIndex(users)
+	writeResponse(w, body, err, r.URL)
 }
 
 func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
