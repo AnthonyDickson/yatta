@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"strconv"
 
@@ -27,6 +28,7 @@ func NewServer(taskStore stores.TaskStore, userStore stores.UserStore, renderer 
 	server.taskStore = taskStore
 	server.userStore = userStore
 
+	// TODO: Prefix API routes with /api. Only view routes should be at the root.
 	router := http.NewServeMux()
 	router.Handle("GET /coffee", http.HandlerFunc(server.getCoffee))
 	router.Handle("GET /", http.HandlerFunc(server.getRoot))
@@ -143,7 +145,9 @@ func (s *Server) addTask(w http.ResponseWriter, r *http.Request) {
 
 const formContentType = "application/x-www-form-urlencoded"
 
+// TODO: Add page for creating a new user.
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
+	// TODO: Split up this function into smaller functions to improve readability.
 	if r.Header.Get("Content-Type") != formContentType {
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 		return
@@ -162,7 +166,20 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email := r.Form.Get("email")
+	raw_email := r.Form.Get("email")
+	email, err := mail.ParseAddress(raw_email)
+
+	if err != nil {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, write_err := w.Write([]byte(fmt.Sprintf("invalid e%v", err)))
+
+		if write_err != nil {
+			slog.Error(fmt.Sprintf("could not write response: %v", write_err))
+		}
+
+		return
+	}
+
 	password := r.Form.Get("password")
 	hash, err := models.NewPasswordHash(password, bcrypt.DefaultCost)
 
@@ -172,7 +189,8 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = s.userStore.AddUser(email, hash)
+	// TODO: Change User to use email.Address instead of string?
+	err = s.userStore.AddUser(email.Address, hash)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

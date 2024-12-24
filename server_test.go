@@ -243,7 +243,22 @@ func TestCreateUser(t *testing.T) {
 		}
 	})
 
-	// TODO: validate emails for formatting and uniqueness, and passwords for strength.
+	t.Run("invalid email returns HTTP status bad request", func(t *testing.T) {
+		request := newCreateUserRequest(t, createUserRequestData{"foo", "averysecretpassword123"})
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusUnprocessableEntity)
+
+		if !strings.Contains(response.Body.String(), "invalid email") {
+			t.Errorf("got no match, want to find %q in %q", "invalid email", response.Body.String())
+		}
+
+		// TODO: check that route returns filled in registration form with error message explaining what's wrong with the email.
+	})
+
+	// TODO: validate passwords for strength.
 }
 
 const htmlContentType = "text/html"
