@@ -31,7 +31,7 @@ func NewServer(taskStore stores.TaskStore, userStore stores.UserStore, renderer 
 	// TODO: Prefix API routes with /api. Only view routes should be at the root.
 	router := http.NewServeMux()
 	router.Handle("GET /coffee", http.HandlerFunc(server.getCoffee))
-	router.Handle("GET /", http.HandlerFunc(server.getRoot))
+	router.Handle("GET /{$}", http.HandlerFunc(server.getRoot))
 	router.Handle("GET /tasks/{id}", http.HandlerFunc(server.getTask))
 	router.Handle("GET /users/{user}/tasks", http.HandlerFunc(server.getTasks))
 	router.Handle("POST /users/{user}/tasks", http.HandlerFunc(server.addTask))
