@@ -16,10 +16,11 @@ var (
 
 // The paths to HTML templates relative to the project root dir.
 const (
-	baseTemplatePath     = "templates/base.html"
-	indexTemplatePath    = "templates/index.html"
-	taskTemplatePath     = "templates/task.html"
-	taskListTemplatePath = "templates/task_list.html"
+	baseTemplatePath             = "templates/base.html"
+	indexTemplatePath            = "templates/index.html"
+	taskTemplatePath             = "templates/task.html"
+	taskListTemplatePath         = "templates/task_list.html"
+	registrationPageTemplatePath = "templates/register.html"
 )
 
 type (
@@ -38,11 +39,16 @@ type (
 		RenderTaskList(tasks []models.Task) ([]byte, error)
 	}
 
+	RegistrationPageRenderer interface {
+		RenderRegistrationPage() ([]byte, error)
+	}
+
 	// Renderer renders page templates as a string.
 	Renderer interface {
 		TaskRenderer
 		TaskListRenderer
 		IndexRenderer
+		RegistrationPageRenderer
 	}
 )
 
@@ -60,7 +66,7 @@ func NewHTMLRenderer() (*HTMLRenderer, error) {
 	renderer.templates = make(map[string]*template.Template)
 
 	// Add new templates here!
-	templates := []string{indexTemplatePath, taskTemplatePath, taskListTemplatePath}
+	templates := []string{indexTemplatePath, taskTemplatePath, taskListTemplatePath, registrationPageTemplatePath}
 
 	for _, templatePath := range templates {
 		tmpl, err := template.ParseFS(templatesFS, templatePath, baseTemplatePath)
@@ -94,6 +100,10 @@ func (r *HTMLRenderer) RenderTask(task models.Task) ([]byte, error) {
 // Returns an error if the template could not be found or rendered.
 func (r *HTMLRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
 	return r.renderHTMLTemplate(taskListTemplatePath, tasks)
+}
+
+func (r *HTMLRenderer) RenderRegistrationPage() ([]byte, error) {
+	return r.renderHTMLTemplate(registrationPageTemplatePath, nil)
 }
 
 // Render data with the template at templatePath.

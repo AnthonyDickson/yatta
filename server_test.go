@@ -261,6 +261,21 @@ func TestCreateUser(t *testing.T) {
 	// TODO: validate passwords for strength.
 }
 
+func TestRegistration(t *testing.T) {
+	t.Run("registration form is served at /register", func(t *testing.T) {
+		renderer := new(SpyRenderer)
+		server := mustCreateServer(t, new(DummyTaskStore), new(DummyUserStore), renderer)
+		request := httptest.NewRequest(http.MethodGet, "/register", nil)
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusOK)
+		assertContentType(t, response, htmlContentType)
+		assertRendersRegistrationPage(t, renderer)
+	})
+}
+
 const htmlContentType = "text/html"
 const formContentType = "application/x-www-form-urlencoded"
 
@@ -309,9 +324,10 @@ func (s *StubTaskStore) GetTask(id uint64) (*models.Task, error) {
 }
 
 type SpyRenderer struct {
-	renderIndexCalls [][]models.User
-	renderTasksCalls [][]models.Task
-	renderTaskCalls  []models.Task
+	renderIndexCalls            [][]models.User
+	renderTasksCalls            [][]models.Task
+	renderTaskCalls             []models.Task
+	renderRegistrationPageCalls int
 }
 
 func (s *SpyRenderer) RenderIndex(users []models.User) ([]byte, error) {
@@ -327,6 +343,12 @@ func (s *SpyRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
 
 func (s *SpyRenderer) RenderTask(task models.Task) ([]byte, error) {
 	s.renderTaskCalls = append(s.renderTaskCalls, task)
+
+	return nil, nil
+}
+
+func (s *SpyRenderer) RenderRegistrationPage() ([]byte, error) {
+	s.renderRegistrationPageCalls++
 
 	return nil, nil
 }
@@ -376,6 +398,10 @@ func (d *DummyRenderer) RenderTask(task models.Task) ([]byte, error) {
 }
 
 func (d *DummyRenderer) RenderTaskList(tasks []models.Task) ([]byte, error) {
+	return nil, nil
+}
+
+func (d *DummyRenderer) RenderRegistrationPage() ([]byte, error) {
 	return nil, nil
 }
 
@@ -606,5 +632,13 @@ func assertRenderTasksCall(t *testing.T, renderer *SpyRenderer, want []models.Ta
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got calls to RenderTasksList %q, want %q", got, want)
+	}
+}
+
+func assertRendersRegistrationPage(t *testing.T, renderer *SpyRenderer) {
+	t.Helper()
+
+	if renderer.renderRegistrationPageCalls != 1 {
+		t.Errorf("got %d calls to RenderRegistrationPage, want 1", renderer.renderRegistrationPageCalls)
 	}
 }

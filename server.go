@@ -14,7 +14,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const htmlContentType = "text/html"
+const (
+	contentTypeHeader = "Content-Type"
+	formContentType   = "application/x-www-form-urlencoded"
+	htmlContentType   = "text/html"
+)
 
 type Server struct {
 	userStore stores.UserStore
@@ -36,6 +40,7 @@ func NewServer(taskStore stores.TaskStore, userStore stores.UserStore, renderer 
 	router.Handle("GET /users/{user}/tasks", http.HandlerFunc(server.getTasks))
 	router.Handle("POST /users/{user}/tasks", http.HandlerFunc(server.addTask))
 	router.Handle("POST /users", http.HandlerFunc(server.createUser))
+	router.Handle("GET /register", http.HandlerFunc(server.getRegisterPage))
 
 	server.Handler = router
 
@@ -113,7 +118,7 @@ func writeResponse(w http.ResponseWriter, body []byte, err error, requestURL *ur
 		return
 	}
 
-	w.Header().Add("content-type", htmlContentType)
+	w.Header().Add(contentTypeHeader, htmlContentType)
 
 	if _, err := w.Write(body); err != nil {
 		slog.Error(fmt.Sprintf("an error occurred while writing the response body: %v", err))
@@ -143,12 +148,9 @@ func (s *Server) addTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-const formContentType = "application/x-www-form-urlencoded"
-
-// TODO: Add page for creating a new user.
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	// TODO: Split up this function into smaller functions to improve readability.
-	if r.Header.Get("Content-Type") != formContentType {
+	if r.Header.Get(contentTypeHeader) != formContentType {
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
@@ -199,4 +201,11 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (s *Server) getRegisterPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add(contentTypeHeader, htmlContentType)
+
+	body, err := s.renderer.RenderRegistrationPage()
+	writeResponse(w, body, err, r.URL)
 }

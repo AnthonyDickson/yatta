@@ -60,6 +60,17 @@ func TestRenderer_Task(t *testing.T) {
 	})
 }
 
+func TestRenderer_RegistrationPage(t *testing.T) {
+	t.Run("renders registration page", func(t *testing.T) {
+		renderer := mustCreateRenderer(t)
+
+		htmlString, err := renderer.RenderRegistrationPage()
+
+		yattatest.AssertNoError(t, err)
+		assertValidRegistrationPage(t, string(htmlString))
+	})
+}
+
 func mustCreateRenderer(t *testing.T) *yatta.HTMLRenderer {
 	t.Helper()
 
@@ -144,4 +155,108 @@ func extractTextNodesFromHTML(t *testing.T, htmlFragment *html.Node, containerTa
 	findTasks(htmlFragment)
 
 	return tasks
+}
+
+func findNodes(t *testing.T, htmlFragment *html.Node, containerTag string) []*html.Node {
+	t.Helper()
+
+	var foundNodes []*html.Node
+
+	var findNodesHelper func(*html.Node)
+	findNodesHelper = func(node *html.Node) {
+		if node.Type == html.ElementNode && node.Data == containerTag {
+			foundNodes = append(foundNodes, node)
+		}
+
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			findNodesHelper(child)
+		}
+	}
+
+	findNodesHelper(htmlFragment)
+
+	return foundNodes
+}
+
+func mustFindNode(t *testing.T, htmlFragment *html.Node, wantTag string) *html.Node {
+	nodes := findNodes(t, htmlFragment, wantTag)
+
+	return nodes[0]
+}
+
+func mustFindNodes(t *testing.T, htmlFragment *html.Node, wantTag string, wantCount int) []*html.Node {
+	t.Helper()
+
+	nodes := findNodes(t, htmlFragment, wantTag)
+
+	if len(nodes) != wantCount {
+		t.Fatalf("expected %d %s elements, got %d", wantCount, wantTag, len(nodes))
+	}
+
+	return nodes
+}
+
+func assertInputsHaveAttributes(t *testing.T, inputs []*html.Node, wantInputAttrs map[string]string) {
+	t.Helper()
+
+	for _, input := range inputs {
+		for _, attribute := range input.Attr {
+			want, ok := wantInputAttrs[attribute.Key]
+
+			if !ok {
+				continue
+			}
+
+			if attribute.Val != want {
+				t.Errorf("got input attribute %q with value %q, want %s=%q", attribute.Key, attribute.Val, attribute.Key, want)
+			}
+
+			delete(wantInputAttrs, attribute.Key)
+		}
+	}
+
+	for attrKey, attrVal := range wantInputAttrs {
+		t.Errorf("got input without attribute %q, want input attribute %s=%q", attrKey, attrKey, attrVal)
+	}
+}
+
+func assertHTMLNodeHasAttributes(t *testing.T, node *html.Node, wantAttrs map[string]string) {
+	t.Helper()
+
+	for _, attribute := range node.Attr {
+		want, ok := wantAttrs[attribute.Key]
+
+		if !ok {
+			continue
+		}
+
+		if attribute.Val != want {
+			t.Errorf("got attribute %q with value %q, want %q", attribute.Key, attribute.Val, want)
+		}
+
+		delete(wantAttrs, attribute.Key)
+	}
+
+	for attrKey, attrVal := range wantAttrs {
+		t.Errorf("got node without attribute %q, want attribute %s=%q", attrKey, attrKey, attrVal)
+	}
+}
+
+func assertValidRegistrationPage(t *testing.T, htmlString string) {
+	t.Helper()
+
+	htmlRootNode, err := html.Parse(strings.NewReader(htmlString))
+	yattatest.AssertNoError(t, err)
+
+	form := mustFindNode(t, htmlRootNode, "form")
+	wantAttrs := map[string]string{"action": "/users", "method": "POST"}
+	assertHTMLNodeHasAttributes(t, form, wantAttrs)
+
+	inputs := mustFindNodes(t, form, "input", 1)
+	wantInputAttrs := map[string]string{"type": "email"}
+	assertInputsHaveAttributes(t, inputs, wantInputAttrs)
+
+	button := mustFindNode(t, form, "button")
+	wantButtonAttrs := map[string]string{"type": "submit"}
+	assertHTMLNodeHasAttributes(t, button, wantButtonAttrs)
 }
