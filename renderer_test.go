@@ -238,7 +238,7 @@ func assertHTMLNodeHasAttributes(t *testing.T, node *html.Node, wantAttrs map[st
 	}
 
 	for attrKey, attrVal := range wantAttrs {
-		t.Errorf("got node without attribute %q, want attribute %s=%q", attrKey, attrKey, attrVal)
+		t.Errorf("got %s element without attribute %q, want attribute %s=%q", node.Data, attrKey, attrKey, attrVal)
 	}
 }
 
@@ -257,6 +257,6 @@ func assertValidRegistrationPage(t *testing.T, htmlString string) {
 	assertInputsHaveAttributes(t, inputs, wantInputAttrs)
 
 	button := mustFindNode(t, form, "button")
-	wantButtonAttrs := map[string]string{"type": "submit"}
+	wantButtonAttrs := map[string]string{"type": "submit", "tabindex": "0"}
 	assertHTMLNodeHasAttributes(t, button, wantButtonAttrs)
 }
