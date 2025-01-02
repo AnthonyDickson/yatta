@@ -1,0 +1,10 @@
+{{define "register_form" }}
+<form action="/users" method="POST">
+  <div>
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="example@email.com" />
+  </div>
+
+  <button type="submit">Create User</button>
+</form>
+{{ end }}

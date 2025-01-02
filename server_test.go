@@ -213,9 +213,8 @@ func TestCreateUser(t *testing.T) {
 		}
 	})
 
-	server := mustCreateServer(t, new(DummyTaskStore), new(DummyUserStore), new(DummyRenderer))
-
 	t.Run("wrong content type returns HTTP status unsupported media type", func(t *testing.T) {
+		server := mustCreateServer(t, new(DummyTaskStore), new(DummyUserStore), new(DummyRenderer))
 		request := httptest.NewRequest(http.MethodPost, "/users", nil)
 		response := httptest.NewRecorder()
 
@@ -225,6 +224,7 @@ func TestCreateUser(t *testing.T) {
 	})
 
 	t.Run("invalid form returns HTTP status bad request", func(t *testing.T) {
+		server := mustCreateServer(t, new(DummyTaskStore), new(DummyUserStore), new(DummyRenderer))
 		cases := []io.Reader{
 			nil,
 			strings.NewReader(""),
@@ -244,6 +244,8 @@ func TestCreateUser(t *testing.T) {
 	})
 
 	t.Run("invalid email returns HTTP status bad request", func(t *testing.T) {
+		renderer := new(SpyRenderer)
+		server := mustCreateServer(t, new(DummyTaskStore), new(DummyUserStore), renderer)
 		request := newCreateUserRequest(t, createUserRequestData{"foo", "averysecretpassword123"})
 		response := httptest.NewRecorder()
 

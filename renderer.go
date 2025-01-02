@@ -21,6 +21,7 @@ const (
 	taskTemplatePath             = "templates/task.html"
 	taskListTemplatePath         = "templates/task_list.html"
 	registrationPageTemplatePath = "templates/register.html"
+	registrationFormPath         = "templates/partials/register_form.html"
 )
 
 type (
@@ -66,16 +67,21 @@ func NewHTMLRenderer() (*HTMLRenderer, error) {
 	renderer.templates = make(map[string]*template.Template)
 
 	// Add new templates here!
-	templates := []string{indexTemplatePath, taskTemplatePath, taskListTemplatePath, registrationPageTemplatePath}
+	templates := map[string][]string{
+		indexTemplatePath:            {baseTemplatePath, indexTemplatePath},
+		taskTemplatePath:             {baseTemplatePath, taskTemplatePath},
+		taskListTemplatePath:         {baseTemplatePath, taskListTemplatePath},
+		registrationPageTemplatePath: {baseTemplatePath, registrationPageTemplatePath, registrationFormPath},
+	}
 
-	for _, templatePath := range templates {
-		tmpl, err := template.ParseFS(templatesFS, templatePath, baseTemplatePath)
+	for path, templatePaths := range templates {
+		tmpl, err := template.ParseFS(templatesFS, templatePaths...)
 
 		if err != nil {
-			return nil, fmt.Errorf("could not parse the templates at %q and %q: %v", templatePath, baseTemplatePath, err)
+			return nil, fmt.Errorf("could not parse the templates at %q and %q: %v", templatePaths, baseTemplatePath, err)
 		}
 
-		renderer.templates[templatePath] = tmpl
+		renderer.templates[path] = tmpl
 	}
 
 	return renderer, nil
