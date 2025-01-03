@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"bytes"
 	"fmt"
 	"log/slog"
 	"reflect"
@@ -196,28 +197,130 @@ func mustFindNodes(t *testing.T, htmlFragment *html.Node, wantTag string, wantCo
 	return nodes
 }
 
-func assertInputsHaveAttributes(t *testing.T, inputs []*html.Node, wantInputAttrs map[string]string) {
+func assertInputsHaveAttributes(t *testing.T, inputs []*html.Node, wantInputAttrs attributeSets) {
 	t.Helper()
 
 	for _, input := range inputs {
-		for _, attribute := range input.Attr {
-			want, ok := wantInputAttrs[attribute.Key]
+		got := newAttributeSet(input)
 
-			if !ok {
-				continue
+		for _, want := range wantInputAttrs {
+			intersection := got.intersection(want)
+
+			if intersection == FULL_INTERSECTION {
+				wantInputAttrs = wantInputAttrs.delete(want)
+				break
+			} else if intersection == PARTIAL_INTERSECTION {
+				found := make(attributeSet)
+				missing := make(attributeSet)
+
+				for wantKey, wantValue := range want {
+					gotValue, ok := got[wantKey]
+
+					if ok && gotValue == wantValue {
+						found[wantKey] = wantValue
+					} else {
+						missing[wantKey] = wantValue
+					}
+				}
+
+				t.Errorf("got input with the attributes %v, was missing %s", found.format(), missing.format())
+				wantInputAttrs = wantInputAttrs.delete(want)
+				break
 			}
-
-			if attribute.Val != want {
-				t.Errorf("got input attribute %q with value %q, want %s=%q", attribute.Key, attribute.Val, attribute.Key, want)
-			}
-
-			delete(wantInputAttrs, attribute.Key)
 		}
 	}
 
-	for attrKey, attrVal := range wantInputAttrs {
-		t.Errorf("got input without attribute %q, want input attribute %s=%q", attrKey, attrKey, attrVal)
+	for _, attributes := range wantInputAttrs {
+		t.Errorf("expected to find an input element with the attributes: %s", attributes.format())
 	}
+}
+
+type attributeSet map[string]string
+
+// newAttributeSet creates a attribute key-value pairs from an HTML node.
+func newAttributeSet(node *html.Node) attributeSet {
+	attributes := make(attributeSet)
+
+	for _, attribute := range node.Attr {
+		attributes[attribute.Key] = attribute.Val
+	}
+
+	return attributes
+}
+
+// Format each key-value pair in the attributeSet as `key="value"` separated with a space.
+func (a attributeSet) format() string {
+	b := new(bytes.Buffer)
+
+	for k, v := range a {
+		fmt.Fprintf(b, "%s=\"%s\" ", k, v)
+	}
+
+	// Remove trailing space
+	b.Truncate(b.Len() - 1)
+
+	return b.String()
+}
+
+const (
+	NO_INTERSECTION      = 1
+	PARTIAL_INTERSECTION = 2
+	FULL_INTERSECTION    = 3
+)
+
+// Find the intersection between two attribute sets.
+//
+// A return value of FULL_INTERSECTION represents the case where all attributes in `want` are
+// found in `got`, i.e. that `got` is a superset of `want`.
+//
+// A return value of PARTIAL_INTERSECTION represents the case where some attributes in `want` are
+// found in `got`, but not all. This includes attributes with the same key but different values.
+//
+// A return value of NO_INTERSECTION represents the case where no attributes in `want` are found in `got`.
+func (got attributeSet) intersection(want attributeSet) int {
+	found := 0
+	wantCount := len(want)
+
+	for attribute, value := range want {
+		gotValue, ok := got[attribute]
+
+		if !ok || gotValue != value {
+			continue
+		}
+
+		found++
+	}
+
+	if found == 0 {
+		return NO_INTERSECTION
+	} else if found == wantCount {
+		return FULL_INTERSECTION
+	} else {
+		return PARTIAL_INTERSECTION
+	}
+}
+
+type attributeSets []attributeSet
+
+// Delete an attribute set from a slice of attribute sets.
+//
+// Note that you must assign the return value to the original slice, e.g. `a = a.delete(b)`.
+func (a attributeSets) delete(attributes attributeSet) attributeSets {
+	index := -1
+
+	for i, attrs := range a {
+		if reflect.DeepEqual(attributes, attrs) {
+			index = i
+		}
+	}
+
+	if index != -1 {
+		a = append(a[:index], a[index+1:]...)
+	} else {
+		panic(fmt.Sprintf("could not find attribute set %v in %v", attributes, a))
+	}
+
+	return a
 }
 
 func assertHTMLNodeHasAttributes(t *testing.T, node *html.Node, wantAttrs map[string]string) {
@@ -252,8 +355,11 @@ func assertValidRegistrationPage(t *testing.T, htmlString string) {
 	wantAttrs := map[string]string{"action": "/users", "method": "POST"}
 	assertHTMLNodeHasAttributes(t, form, wantAttrs)
 
-	inputs := mustFindNodes(t, form, "input", 1)
-	wantInputAttrs := map[string]string{"type": "email"}
+	wantInputAttrs := attributeSets{
+		attributeSet{"type": "email", "name": "email", "required": ""},
+		attributeSet{"type": "password", "name": "password", "required": ""},
+	}
+	inputs := mustFindNodes(t, form, "input", len(wantInputAttrs))
 	assertInputsHaveAttributes(t, inputs, wantInputAttrs)
 
 	button := mustFindNode(t, form, "button")

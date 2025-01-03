@@ -260,6 +260,8 @@ func TestCreateUser(t *testing.T) {
 		// TODO: check that route returns filled in registration form with error message explaining what's wrong with the email.
 	})
 
+	// TODO: Check that the email is unique.
+
 	// TODO: validate passwords for strength.
 }
 
