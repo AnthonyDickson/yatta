@@ -28,7 +28,7 @@ func TestFileUserStore_New(t *testing.T) {
           "Email": "bob@example.com",
           "Password": %q
         }
-      ]`, want_users[0].Password.Hash, want_users[1].Password.Hash))
+      ]`, want_users[0].Password, want_users[1].Password))
 		defer cleanup()
 
 		store := mustCreateFileUserStore(t, database)
@@ -80,7 +80,7 @@ func TestFileUserStore_EmailInUse(t *testing.T) {
       "ID": 1,
       "Email": %q,
       "Password": %q
-      }]`, email, password.Hash))
+      }]`, email, password))
 		defer cleanup()
 		store := mustCreateFileUserStore(t, database)
 

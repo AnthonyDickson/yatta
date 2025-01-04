@@ -7,7 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func MustCreatePasswordHash(t *testing.T, password string) *models.PasswordHash {
+func MustCreatePasswordHash(t *testing.T, password string) models.PasswordHash {
 	t.Helper()
 
 	hash, err := models.NewPasswordHash(password, bcrypt.MinCost)

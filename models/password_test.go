@@ -57,14 +57,14 @@ func TestPasswordHash_JSON(t *testing.T) {
 	t.Run("can marshal and unmarshal JSON", func(t *testing.T) {
 		want := yattatest.MustCreatePasswordHash(t, "EdwardBerenstein")
 
-		bytes, err := json.Marshal(want)
+		bytes, err := json.Marshal(&want)
 		yattatest.AssertNoError(t, err)
 
-		var got *models.PasswordHash
+		var got models.PasswordHash
 		err = json.Unmarshal(bytes, &got)
 		yattatest.AssertNoError(t, err)
 
-		if !slices.Equal(got.Hash, want.Hash) {
+		if !slices.Equal(got, want) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	})

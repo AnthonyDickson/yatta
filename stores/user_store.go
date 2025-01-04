@@ -11,7 +11,7 @@ type UserStore interface {
 	// Email addresses must be unique.
 	//
 	// Returns an error if the email address is already in use.
-	AddUser(email string, password *models.PasswordHash) error
+	AddUser(email string, password models.PasswordHash) error
 
 	// GetUser retrieves a user by their ID.
 	GetUser(id uint64) (*models.User, error)

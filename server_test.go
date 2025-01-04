@@ -379,7 +379,7 @@ func (s *StubTaskStore) AddTask(user string, task string) error {
 
 type DummyUserStore struct{}
 
-func (d *DummyUserStore) AddUser(email string, password *models.PasswordHash) error {
+func (d *DummyUserStore) AddUser(email string, password models.PasswordHash) error {
 	return nil
 }
 
@@ -434,14 +434,14 @@ type createUserRequestData struct {
 
 type addUserCall struct {
 	Email    string
-	Password *models.PasswordHash
+	Password models.PasswordHash
 }
 
 type StubUserStore struct {
 	users []models.User
 }
 
-func (s *StubUserStore) AddUser(email string, password *models.PasswordHash) error {
+func (s *StubUserStore) AddUser(email string, password models.PasswordHash) error {
 	return nil
 }
 
@@ -467,7 +467,7 @@ type SpyUserStore struct {
 	createUserCalls []addUserCall
 }
 
-func (s *SpyUserStore) AddUser(email string, password *models.PasswordHash) error {
+func (s *SpyUserStore) AddUser(email string, password models.PasswordHash) error {
 	s.createUserCalls = append(s.createUserCalls, addUserCall{email, password})
 	return nil
 }

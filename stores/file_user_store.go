@@ -57,7 +57,7 @@ func loadUserStore(database *os.File) (userList, error) {
 	return users, nil
 }
 
-func (f *FileUserStore) AddUser(email string, password *models.PasswordHash) error {
+func (f *FileUserStore) AddUser(email string, password models.PasswordHash) error {
 	nextID := f.users.nextID()
 	// TODO: Return an error if the email address is already in use.
 
