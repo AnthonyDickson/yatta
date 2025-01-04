@@ -1,12 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/mail"
-	"net/url"
 	"strconv"
 
 	"github.com/AnthonyDickson/yatta/models"
@@ -19,6 +19,15 @@ const (
 	formContentType   = "application/x-www-form-urlencoded"
 	htmlContentType   = "text/html"
 )
+
+type handlerError struct {
+	status int
+	err    error
+}
+
+func (h handlerError) Error() string {
+	return fmt.Sprintf("HTTP status code %d: %v", h.status, h.err)
+}
 
 type Server struct {
 	userStore stores.UserStore
@@ -57,13 +66,12 @@ func (s *Server) getRoot(w http.ResponseWriter, r *http.Request) {
 	users, err := s.userStore.GetUsers()
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("could not get users: %v", err))
+		writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("could not get users: %v", err))
 		return
 	}
 
 	body, err := s.renderer.RenderIndex(users)
-	writeResponse(w, body, err, r.URL)
+	writeRendererResponse(w, r, body, err)
 }
 
 func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +86,7 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 	task, err := s.taskStore.GetTask(id)
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("could not get task with ID %q with URL %q: %v", id, r.URL, err))
+		writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("could not get task with ID %q: %v", id, err))
 		return
 	}
 
@@ -89,7 +96,7 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body, err := s.renderer.RenderTask(*task)
-	writeResponse(w, body, err, r.URL)
+	writeRendererResponse(w, r, body, err)
 }
 
 func (s *Server) getTasks(w http.ResponseWriter, r *http.Request) {
@@ -97,8 +104,7 @@ func (s *Server) getTasks(w http.ResponseWriter, r *http.Request) {
 	tasks, err := s.taskStore.GetTasks(user)
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("an error occurred while getting the tasks for %s: %v", r.URL, err))
+		writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("could not get tasks for user %q: %v", user, err))
 		return
 	}
 
@@ -108,13 +114,114 @@ func (s *Server) getTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body, err := s.renderer.RenderTaskList(tasks)
-	writeResponse(w, body, err, r.URL)
+	writeRendererResponse(w, r, body, err)
 }
 
-func writeResponse(w http.ResponseWriter, body []byte, err error, requestURL *url.URL) {
+func (s *Server) addTask(w http.ResponseWriter, r *http.Request) {
+	user := r.PathValue("user")
+	bodyBytes, err := io.ReadAll(r.Body)
+
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("an error occurred while rendering the template for %s: %v", requestURL, err))
+		writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("could not read the request body: %v", err))
+		return
+	}
+
+	task := string(bodyBytes)
+	err = s.taskStore.AddTask(user, task)
+
+	if err != nil {
+		writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("could not add task %q for user %q: %v", user, task, err))
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
+	raw_email, password, e := parseRegistrationFrom(r)
+
+	if e != nil {
+		writeError(w, r, e.status, fmt.Sprintf("could not parse registration form: %v", e.err))
+		return
+	}
+
+	email, err := mail.ParseAddress(raw_email)
+
+	if err != nil {
+		writeReponse(w, http.StatusUnprocessableEntity, fmt.Sprintf("invalid email: %v", err))
+		return
+	}
+
+	hash, err := models.NewPasswordHash(password, bcrypt.DefaultCost)
+
+	if err != nil {
+		writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("could not create password hash: %v", err))
+		return
+	}
+
+	if s.userStore.EmailInUse(email.Address) {
+		writeReponse(w, http.StatusConflict, fmt.Sprintf("email %q is already in use", email.Address))
+		return
+	}
+
+	// TODO: Change User to use email.Address instead of string?
+	err = s.userStore.AddUser(email.Address, hash)
+
+	if err != nil {
+		writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("could not create user: %v", err))
+		return
+	}
+
+	writeReponse(w, http.StatusAccepted, fmt.Sprintf("user %q created", email.Address))
+}
+
+func (s *Server) getRegisterPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add(contentTypeHeader, htmlContentType)
+	body, err := s.renderer.RenderRegistrationPage()
+	writeRendererResponse(w, r, body, err)
+}
+
+func parseRegistrationFrom(r *http.Request) (email string, password string, err *handlerError) {
+	if r.Header.Get(contentTypeHeader) != formContentType {
+		return "", "", &handlerError{
+			status: http.StatusUnsupportedMediaType,
+			err:    fmt.Errorf("content type %q not supported", r.Header.Get(contentTypeHeader)),
+		}
+	}
+
+	e := r.ParseForm()
+
+	if e != nil {
+		return "", "", &handlerError{status: http.StatusBadRequest, err: e}
+	}
+
+	if !r.Form.Has("email") || !r.Form.Has("password") {
+		return "", "", &handlerError{status: http.StatusBadRequest, err: errors.New("email or password not set in form")}
+	}
+
+	email = r.Form.Get("email")
+	password = r.Form.Get("password")
+
+	return email, password, nil
+}
+
+func writeReponse(w http.ResponseWriter, status int, body string) {
+	w.Header().Add(contentTypeHeader, htmlContentType)
+	w.WriteHeader(status)
+
+	if _, err := w.Write([]byte(body)); err != nil {
+		slog.Error(fmt.Sprintf("could not write response: %v", err))
+	}
+}
+
+func writeError(w http.ResponseWriter, r *http.Request, status int, message string) {
+	w.WriteHeader(status)
+	slog.Error(fmt.Sprintf("[%s] %d: %s", r.URL, status, message))
+}
+
+func writeRendererResponse(w http.ResponseWriter, r *http.Request, body []byte, err error) {
+	if err != nil {
+		writeError(w, r, http.StatusInternalServerError, fmt.Sprintf("an error occurred while rendering the template: %v", err))
 		return
 	}
 
@@ -123,95 +230,4 @@ func writeResponse(w http.ResponseWriter, body []byte, err error, requestURL *ur
 	if _, err := w.Write(body); err != nil {
 		slog.Error(fmt.Sprintf("an error occurred while writing the response body: %v", err))
 	}
-}
-
-func (s *Server) addTask(w http.ResponseWriter, r *http.Request) {
-	user := r.PathValue("user")
-	bodyBytes, err := io.ReadAll(r.Body)
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Warn(fmt.Sprintf("an error occurred while reading the request body %v: %v", r.Body, err))
-		return
-	}
-
-	task := string(bodyBytes)
-
-	err = s.taskStore.AddTask(user, task)
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("could not add task %q for user %q: %v", user, task, err))
-		return
-	}
-
-	w.WriteHeader(http.StatusAccepted)
-}
-
-func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
-	// TODO: Split up this function into smaller functions to improve readability.
-	if r.Header.Get(contentTypeHeader) != formContentType {
-		w.WriteHeader(http.StatusUnsupportedMediaType)
-		return
-	}
-
-	err := r.ParseForm()
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("could not parse form: %v", err))
-		return
-	}
-
-	if !r.Form.Has("email") || !r.Form.Has("password") {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	raw_email := r.Form.Get("email")
-	email, err := mail.ParseAddress(raw_email)
-
-	if err != nil {
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		_, write_err := w.Write([]byte(fmt.Sprintf("invalid e%v", err)))
-
-		if write_err != nil {
-			slog.Error(fmt.Sprintf("could not write response: %v", write_err))
-		}
-
-		return
-	}
-
-	password := r.Form.Get("password")
-	hash, err := models.NewPasswordHash(password, bcrypt.DefaultCost)
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("could not create password hash: %v", err))
-		return
-	}
-
-	if s.userStore.EmailInUse(email.Address) {
-		w.Header().Add(contentTypeHeader, htmlContentType)
-		w.WriteHeader(http.StatusConflict)
-		return
-	}
-
-	// TODO: Change User to use email.Address instead of string?
-	err = s.userStore.AddUser(email.Address, hash)
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		slog.Error(fmt.Sprintf("could not create user: %v", err))
-		return
-	}
-
-	w.WriteHeader(http.StatusAccepted)
-}
-
-func (s *Server) getRegisterPage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add(contentTypeHeader, htmlContentType)
-
-	body, err := s.renderer.RenderRegistrationPage()
-	writeResponse(w, body, err, r.URL)
 }
