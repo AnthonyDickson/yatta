@@ -6,6 +6,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// TODO: Convert PasswordHash to a type alias for []byte.
+
 // A PasswordHash stores a hashed and salted password.
 type PasswordHash struct {
 	// The Hash and salt.

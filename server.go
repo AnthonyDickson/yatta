@@ -191,6 +191,13 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.userStore.EmailInUse(email.Address) {
+		w.Header().Add(contentTypeHeader, htmlContentType)
+		w.WriteHeader(http.StatusConflict)
+		slog.Warn(fmt.Sprintf("email address %q is already in use", email.Address))
+		return
+	}
+
 	// TODO: Change User to use email.Address instead of string?
 	err = s.userStore.AddUser(email.Address, hash)
 

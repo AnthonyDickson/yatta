@@ -260,7 +260,21 @@ func TestCreateUser(t *testing.T) {
 		// TODO: check that route returns filled in registration form with error message explaining what's wrong with the email.
 	})
 
-	// TODO: Check that the email is unique.
+	t.Run("email must be unique", func(t *testing.T) {
+		email := "test@example.com"
+		store := &StubUserStore{users: []models.User{
+			{ID: 1, Email: email, Password: yattatest.MustCreatePasswordHash(t, "test")},
+		}}
+		server := mustCreateServer(t, new(DummyTaskStore), store, new(DummyRenderer))
+		request := newCreateUserRequest(t, createUserRequestData{email, "test"})
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusConflict)
+		assertContentType(t, response, htmlContentType)
+		// TODO: Check that the response body contains a message about the email being in use.
+	})
 
 	// TODO: validate passwords for strength.
 }
@@ -377,6 +391,10 @@ func (d *DummyUserStore) GetUsers() ([]models.User, error) {
 	return nil, nil
 }
 
+func (d *DummyUserStore) EmailInUse(email string) bool {
+	return false
+}
+
 type DummyTaskStore struct{}
 
 func (d *DummyTaskStore) GetTask(id uint64) (*models.Task, error) {
@@ -435,6 +453,16 @@ func (s *StubUserStore) GetUsers() ([]models.User, error) {
 	return s.users, nil
 }
 
+func (s *StubUserStore) EmailInUse(email string) bool {
+	for _, user := range s.users {
+		if user.Email == email {
+			return true
+		}
+	}
+
+	return false
+}
+
 type SpyUserStore struct {
 	createUserCalls []addUserCall
 }
@@ -450,6 +478,10 @@ func (s *SpyUserStore) GetUser(id uint64) (*models.User, error) {
 
 func (s *SpyUserStore) GetUsers() ([]models.User, error) {
 	return nil, nil
+}
+
+func (s *SpyUserStore) EmailInUse(email string) bool {
+	return false
 }
 
 func mustCreateServer(t *testing.T, taskStore stores.TaskStore, userStore stores.UserStore, renderer yatta.Renderer) *yatta.Server {

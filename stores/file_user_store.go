@@ -59,6 +59,7 @@ func loadUserStore(database *os.File) (userList, error) {
 
 func (f *FileUserStore) AddUser(email string, password *models.PasswordHash) error {
 	nextID := f.users.nextID()
+	// TODO: Return an error if the email address is already in use.
 
 	f.users = append(f.users, models.User{ID: nextID, Email: email, Password: password})
 
@@ -71,6 +72,16 @@ func (f *FileUserStore) GetUser(id uint64) (*models.User, error) {
 
 func (f *FileUserStore) GetUsers() ([]models.User, error) {
 	return f.users, nil
+}
+
+func (f *FileUserStore) EmailInUse(email string) bool {
+	for _, user := range f.users {
+		if user.Email == email {
+			return true
+		}
+	}
+
+	return false
 }
 
 type userList []models.User

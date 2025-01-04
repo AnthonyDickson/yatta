@@ -72,6 +72,38 @@ func TestFileUserStore_Add(t *testing.T) {
 	})
 }
 
+func TestFileUserStore_EmailInUse(t *testing.T) {
+	t.Run("returns true if email is in use", func(t *testing.T) {
+		email := "test@example.com"
+		password := yattatest.MustCreatePasswordHash(t, "test")
+		database, cleanup := yattatest.CreateTempFile(t, fmt.Sprintf(`[{
+      "ID": 1,
+      "Email": %q,
+      "Password": %q
+      }]`, email, password.Hash))
+		defer cleanup()
+		store := mustCreateFileUserStore(t, database)
+
+		emailInUse := store.EmailInUse(email)
+
+		if emailInUse != true {
+			t.Errorf("got %v, want true", emailInUse)
+		}
+	})
+
+	t.Run("returns false if email is not in use", func(t *testing.T) {
+		database, cleanup := yattatest.CreateTempFile(t, "")
+		defer cleanup()
+		store := mustCreateFileUserStore(t, database)
+
+		emailInUse := store.EmailInUse("test@example.com")
+
+		if emailInUse != false {
+			t.Errorf("got %v, want false", emailInUse)
+		}
+	})
+}
+
 func mustCreateFileUserStore(t *testing.T, database *os.File) *stores.FileUserStore {
 	t.Helper()
 
